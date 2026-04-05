@@ -15,19 +15,20 @@
 
 #include "CLI/CLI.hpp"
 #include "common/result.h"
+#include "common/error.h"
 #include "utils/logger.h"
-
+    
 struct ArgParserResult {
-    int optimizationLevel = 0;
     std::string inputFile;
     std::string outputFile = "output.txt";
     std::string logLevel = "INFO";
     std::string logFile = "logs/argparser.log";
 
     bool operator==(const ArgParserResult& o) const {
-        return optimizationLevel == o.optimizationLevel && inputFile == o.inputFile &&
-               outputFile == o.outputFile && logLevel == o.logLevel && logFile == o.logFile;
+        return inputFile == o.inputFile && outputFile == o.outputFile;
     }
+
+    ArgParserResult(const std::string& inputFile, const std::string& outputFile) : inputFile(inputFile), outputFile(outputFile) {}
 };
 
 struct ArgParserError : public Error {
@@ -42,7 +43,7 @@ class ArgParser {
 public:
     ArgParser(int argc, char** argv);
     ~ArgParser();
-    Result<void> parse();
+    Result<ArgParserResult> parse();
 
 private:
     int _argc;
@@ -50,6 +51,8 @@ private:
     std::unique_ptr<CLI::App> _app;
     bool _version = false;
     std::string _logLevelStr;
+    std::string _inputFileStr;
+    std::string _outputFileStr;
     CLI::Option* _logLevelOpt = nullptr;
 };
 

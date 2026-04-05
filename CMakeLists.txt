@@ -13,6 +13,7 @@ include(FetchContent)
 add_library(utils 
     src/utils/logger.cpp
     src/utils/argparser.cpp
+    src/utils/filereader.cpp
 )
 
 # Download the CLI parser
