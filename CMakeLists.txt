@@ -1,7 +1,10 @@
 cmake_minimum_required(VERSION 3.16)
 project(WinZigCParser)
 
+enable_testing()
+
 set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # To install libraries
 include(FetchContent)
@@ -30,11 +33,24 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(spdlog)
 
+# Download Googletest
+FetchContent_Declare(
+    googletest
+    GIT_REPOSITORY https://github.com/google/googletest.git
+    GIT_TAG v1.17.0
+)
+
+# For Windows compatibility (safe to include always)
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+
+FetchContent_MakeAvailable(googletest)
+
 # Include the header files
 target_include_directories(utils PUBLIC include)
 
 # Create executable
 add_executable(parser app/main.cpp)
+
 
 # Link libraries
 target_link_libraries(utils
@@ -46,3 +62,30 @@ target_link_libraries(parser
     PRIVATE
         utils
 )
+
+# Add test scripts for testing
+add_executable(tests 
+    tests/unit/test_argparser.cpp
+)
+
+target_link_libraries(tests
+    PRIVATE
+        gtest_main
+        utils
+)
+
+include(GoogleTest)
+gtest_discover_tests(tests)
+
+# Test Coverage
+option(ENABLE_COVERAGE "Enable coverage" ON)
+
+if(ENABLE_COVERAGE)
+    target_compile_options(parser PRIVATE --coverage)
+    target_link_options(parser PRIVATE --coverage)
+    target_compile_options(utils PRIVATE --coverage)
+    target_link_options(utils PRIVATE --coverage)
+    # tests links utils; instrumented .o files need the same coverage runtime at link time
+    target_compile_options(tests PRIVATE --coverage)
+    target_link_options(tests PRIVATE --coverage)
+endif()

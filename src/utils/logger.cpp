@@ -36,3 +36,7 @@ void Logger::error(const std::string& msg) {
 void Logger::setLevel(spdlog::level::level_enum level) {
     _logger->set_level(level);
 }
+
+spdlog::level::level_enum Logger::getLevel() {
+    return _logger ? _logger->level() : spdlog::level::off;
+}

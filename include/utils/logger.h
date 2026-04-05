@@ -24,6 +24,8 @@ public:
 
     static void setLevel(spdlog::level::level_enum level);
 
+    static spdlog::level::level_enum getLevel();
+
     static void debug(const std::string& msg);
     static void info(const std::string& msg);
     static void warn(const std::string& msg);
