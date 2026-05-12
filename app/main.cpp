@@ -24,7 +24,6 @@ int main(int argc, char** argv) {
     }
 
     auto tokenizer = Tokenizer(std::string(fileReaderResult.value.value().content));
-    LOG_INFO("File content : " + fileReaderResult.value.value().content);
     auto toks =  tokenizer.tokenize();
 
     // iterate through `toks` and printing the tokens
