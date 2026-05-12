@@ -14,6 +14,7 @@ add_library(utils
     src/utils/logger.cpp
     src/utils/argparser.cpp
     src/utils/filereader.cpp
+    src/utils/tokenizer.cpp
 )
 
 # Download the CLI parser

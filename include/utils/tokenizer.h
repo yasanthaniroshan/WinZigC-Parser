@@ -14,6 +14,8 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#include <cctype>
+#include <map>
 
 #include <common/result.h>
 #include <common/error.h>
@@ -87,7 +89,7 @@ enum class TokensType {
     Divide,             // /
 
     // delimiters
-    Key_dots,   // .. for case expression
+    Dots,   // .. for case expression
     Colon,      // :
     Semicolon,  // ;
     SingleDot,  // .
@@ -96,6 +98,10 @@ enum class TokensType {
     CloseParen  // )
 };
 
+// For printing out the tokens 
+std::string tokenTypeToString(TokensType type);
+
+// Token struct 
 struct Token {
     TokensType type;
     std::string lexeme;
@@ -112,6 +118,7 @@ struct Token {
     }
 };
 
+
 // Custom error type for specifically tokenizer errors.
 struct TokenizerError : Error {
     explicit TokenizerError(std::string message, int line, int column);
@@ -123,6 +130,7 @@ private:
     int column;
 };
 
+
 // Tokenizer class definition. 
 class Tokenizer {
 public:
@@ -131,15 +139,21 @@ public:
 
     // the actual tokenizing function. returns vector of Token structs.
     Result<std::vector<Token>> tokenize();
+    Result<Token> nextToken();
 
 private:
     std::string_view source;
     size_t current = 0; // current position in source string (internal state of tokenizer)
     int column = 1;
     int line = 1;
-};
 
-// For printing out the tokens. Function implemented in `tokenizer.cpp`.
-std::string tokenTypeToString(TokensType type);
+    char peek() const;
+    char peekNext() const;
+    bool isAtEnd() const;
+    char advance();
+    bool match(char expected);
+    void skipWhitespace();
+    void skipLineComment();
+};
 
 #endif

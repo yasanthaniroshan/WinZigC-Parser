@@ -5,6 +5,7 @@
 #include "utils/logger.h"
 #include "utils/argparser.h"
 #include "utils/filereader.h"
+#include "utils/tokenizer.h"
 
 int main(int argc, char** argv) {
     Logger::init("WinZigCParser");
@@ -21,6 +22,21 @@ int main(int argc, char** argv) {
         LOG_ERROR(fileReaderResult.error_message.value());
         return 1;
     }
+
+    auto tokenizer = Tokenizer(std::string(fileReaderResult.value.value().content));
+    LOG_INFO("File content : " + fileReaderResult.value.value().content);
+    auto toks =  tokenizer.tokenize();
+
+    // iterate through `toks` and printing the tokens
+    // DEBUGGING
+    if (!toks.success) {
+        LOG_ERROR(toks.error_message.value());
+        return 1;
+    }
+    for (const auto& token : toks.value.value()) {
+        LOG_INFO("Token: " + token.toString());
+    }
+
     LOG_INFO("File read successfully: " + fileReaderResult.value.value().content);
     return 0;
 }
