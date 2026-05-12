@@ -135,14 +135,14 @@ private:
 class Tokenizer {
 public:
     // string_view is a non-owning reference (pointer + length) to a string.
-    explicit Tokenizer(std::string_view source);
+    explicit Tokenizer(std::string source);
 
     // the actual tokenizing function. returns vector of Token structs.
     Result<std::vector<Token>> tokenize();
     Result<Token> nextToken();
 
 private:
-    std::string_view source;
+    std::string source;
     size_t current = 0; // current position in source string (internal state of tokenizer)
     int column = 1;
     int line = 1;

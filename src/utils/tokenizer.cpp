@@ -138,7 +138,7 @@ std::string TokenizerError::message() const {
 
 
 ///// Tokenizer implementation
-Tokenizer::Tokenizer(std::string_view source) : source(source) {}
+Tokenizer::Tokenizer(std::string source) : source(source) {}
 
 // Go through the source input file and return a Result type with vector of `Token`s.
 Result<std::vector<Token>> Tokenizer::tokenize() {
