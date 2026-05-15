@@ -13,6 +13,8 @@ include(FetchContent)
 add_library(utils 
     src/utils/logger.cpp
     src/utils/argparser.cpp
+    src/utils/filereader.cpp
+    src/utils/tokenizer.cpp
 )
 
 # Download the CLI parser
@@ -78,7 +80,7 @@ include(GoogleTest)
 gtest_discover_tests(tests)
 
 # Test Coverage
-option(ENABLE_COVERAGE "Enable coverage" ON)
+option(ENABLE_COVERAGE "Enable coverage" OFF)
 
 if(ENABLE_COVERAGE)
     target_compile_options(parser PRIVATE --coverage)

@@ -11,13 +11,19 @@ protected:
 TEST_F(ArgParserTest, VersionFlag) {
     const char* argv[] = {"parser", "--version"};
     int argc = 2;
-    EXPECT_EQ(ArgParser(argc, (char**)argv).parse(), Result<void>::Ok());
+    auto r = ArgParser(argc, (char**)argv).parse();
+    ASSERT_TRUE(r.success);
+    ASSERT_TRUE(r.value.has_value());
+    EXPECT_TRUE(r.value->showVersion);
+    EXPECT_EQ(r.value->inputFile, "");
+    EXPECT_EQ(r.value->outputFile, "");
 }
 
 TEST_F(ArgParserTest, LogLevelOption) {
-    const char* argv[] = {"parser", "-l", "DEBUG"};
-    int argc = 3;
-    EXPECT_EQ(ArgParser(argc, (char**)argv).parse(), Result<void>::Ok());
+    const char* argv[] = {"parser", "-l", "DEBUG", "input.txt"};
+    int argc = 4;
+    auto expected = Result<ArgParserResult>::Ok(ArgParserResult("input.txt", "output.txt"));
+    EXPECT_EQ(ArgParser(argc, (char**)argv).parse(), expected);
     EXPECT_EQ(Logger::getLevel(), spdlog::level::debug);
 }
 
@@ -25,5 +31,5 @@ TEST_F(ArgParserTest, InvalidLogLevelOption) {
     const char* argv[] = {"parser", "-l", "INVALID"};
     int argc = 3;
     EXPECT_EQ(ArgParser(argc, (char**)argv).parse(),
-              Result<void>::Err(ArgParserError("Invalid log level: INVALID")));
+              Result<ArgParserResult>::Err(ArgParserError("Invalid log level: INVALID")));
 }
