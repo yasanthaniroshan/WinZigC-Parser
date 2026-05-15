@@ -80,7 +80,7 @@ include(GoogleTest)
 gtest_discover_tests(tests)
 
 # Test Coverage
-option(ENABLE_COVERAGE "Enable coverage" ON)
+option(ENABLE_COVERAGE "Enable coverage" OFF)
 
 if(ENABLE_COVERAGE)
     target_compile_options(parser PRIVATE --coverage)

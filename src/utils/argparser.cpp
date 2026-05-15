@@ -3,10 +3,11 @@
 ArgParser::ArgParser(int argc, char** argv)
     : _argc(argc), _argv(argv), _app(std::make_unique<CLI::App>()) {
     _app->add_flag("--version", _version, "Print version and exit");
-    _app->add_option("-l,--log-level", _logLevelStr, "Set log level");
+    _logLevelOpt = _app->add_option("-l,--log-level", _logLevelStr, "Set log level");
     _app->add_option("-i,--input-file", _inputFileStr, "Set input file");
     _app->add_option("-o,--output-file", _outputFileStr, "Set output file");
-    _app->add_option("input", _inputFileStr, "Set input file");
+    auto* inputOpt = _app->add_option("input", _inputFileStr, "Input file");
+    inputOpt->required(false);
 }
 
 Result<ArgParserResult> ArgParser::parse() {
@@ -18,7 +19,9 @@ Result<ArgParserResult> ArgParser::parse() {
 
     if (_version) {
         LOG_INFO("WinZigCParser version 0.1");
-        return Result<ArgParserResult>::Ok(ArgParserResult(_inputFileStr, _outputFileStr));
+        ArgParserResult r("", "");
+        r.showVersion = true;
+        return Result<ArgParserResult>::Ok(std::move(r));
     }
 
     if (_logLevelOpt && _logLevelOpt->count() > 0) {
@@ -39,12 +42,13 @@ Result<ArgParserResult> ArgParser::parse() {
         Logger::setLevel(level);
     }
 
-    if(_inputFileStr.empty()) {
+    if (_inputFileStr.empty()) {
         LOG_ERROR("Input file is required");
         return Result<ArgParserResult>::Err(ArgParserError("Input file is required"));
     }
 
-    return Result<ArgParserResult>::Ok(ArgParserResult(_inputFileStr, _outputFileStr));
+    std::string output = _outputFileStr.empty() ? "output.txt" : _outputFileStr;
+    return Result<ArgParserResult>::Ok(ArgParserResult(_inputFileStr, output));
 }
 
 ArgParser::~ArgParser() = default;

@@ -15,6 +15,9 @@ int main(int argc, char** argv) {
         return 1;
     }
     auto result = argParserResult.value.value();
+    if (result.showVersion) {
+        return 0;   
+    }
     LOG_INFO("WinZigCParser started");
     auto fileReader = FileReader(result.inputFile);
     auto fileReaderResult = fileReader.read();

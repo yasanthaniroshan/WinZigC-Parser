@@ -23,9 +23,10 @@ struct ArgParserResult {
     std::string outputFile = "output.txt";
     std::string logLevel = "INFO";
     std::string logFile = "logs/argparser.log";
+    bool showVersion = false;
 
     bool operator==(const ArgParserResult& o) const {
-        return inputFile == o.inputFile && outputFile == o.outputFile;
+        return inputFile == o.inputFile && outputFile == o.outputFile && showVersion == o.showVersion;
     }
 
     ArgParserResult(const std::string& inputFile, const std::string& outputFile) : inputFile(inputFile), outputFile(outputFile) {}
