@@ -154,6 +154,7 @@ private:
     bool match(char expected);
     void skipWhitespace();
     void skipLineComment();
+    void skipNewlines();
 };
 
 #endif
