@@ -5,7 +5,7 @@
 #include "common/error.h"
 #include "utils/logger.h"
 #include "utils/tokenizer.h"
-
+#include "utils/tree.h"
 
 struct ParserError : public Error {
     std::string msg;
@@ -21,7 +21,9 @@ public:
 
 private:
     std::vector<Token> tokens; // The tokens to parse.
+    std::vector<TreeNode*> stack; // The stack of nodes.
     size_t current = 0; // current position in tokens vector
+
 
     bool isAtEnd() const; // Check if the end of the tokens is reached.
     bool check(TokensType type) const; // Check if the current token matches the type.
@@ -46,5 +48,11 @@ private:
     void identifier(); // Parse the identifier.
     void outputExpression(); // Parse the output expression.
     void stringLiteral(); // Parse the string literal.
+
+    // Stack Operations
+    void push(TreeNode* node); // Push a node onto the stack.
+    TreeNode* pop(); // Pop a node from the stack.
+
+    void buildTree(std::string x, int n); // Build the tree.
 };
 #endif

@@ -14,7 +14,11 @@
 Parser::Parser(const std::vector<Token>& tokens) : tokens(tokens) {}
 
 // Destructor for the Parser class.
-Parser::~Parser() = default;
+Parser::~Parser() {
+    for (TreeNode* node : stack) {
+        delete node;
+    }
+}
 
 // ==================== Helper Functions ====================
 
@@ -25,6 +29,7 @@ Result<void> Parser::parse() {
         LOG_ERROR("Expected end of file");
         return Result<void>::Err(ParserError("Expected end of file"));
     }
+    printTree(stack.back(), 0);
     return Result<void>::Ok();
 }
 
@@ -55,16 +60,9 @@ Token Parser::advance() {
     return previous();
 }
 
-// Skip newlines.
-void Parser::skipNewlines() {
-    while (check(TokensType::Newline)) {
-        advance();
-    }
-}
 
 // Consume the current token if it matches the type.
 Token Parser::consume(TokensType type,const std::string& what) {
-    skipNewlines();
     if(check(type)) {
         Token token = advance();
         LOG_INFO("Consumed " + what + ": " + token.toString());
@@ -78,10 +76,13 @@ Token Parser::consume(TokensType type,const std::string& what) {
 
 // Parse the identifier.
 void Parser::identifier() {
-    skipNewlines();
     if(check(TokensType::Identifier)) {
         Token token = advance();
         LOG_INFO("Identifier found: " + token.toString());
+        TreeNode* node = new TreeNode("identifier");
+        TreeNode* child = new TreeNode(token.lexeme);
+        node->left = child;
+        push(node);
         return; // TODO: Update the implementation
     }
     LOG_ERROR("Expected identifier but found " + peek().toString());
@@ -91,43 +92,47 @@ void Parser::identifier() {
 // Parse the consts.
 void Parser::consts() {
     LOG_INFO("Parsing constants");
+    push(new TreeNode("consts"));
     return; // TODO: Implement
 }
 
 // Parse the types.
 void Parser::types() {
     LOG_INFO("Parsing types");
+    push(new TreeNode("types"));
     return; // TODO: Implement
 }
 
 // Parse the dclns.
 void Parser::dclns() {
     LOG_INFO("Parsing declarations");
+    push(new TreeNode("dclns"));
     return; // TODO: Implement
 }
 
 // Parse the subprogs.
 void Parser::subprogs() {
     LOG_INFO("Parsing subprograms");
+    push(new TreeNode("subprogs"));
     return; // TODO: Implement
 }
 
 // Parse the string literal.
 void Parser::stringLiteral() {
     LOG_INFO("Parsing string literal");
-    consume(TokensType::String, "string literal");
-    return; // TODO: Implement
+    Token token = consume(TokensType::String, "string literal");
+    TreeNode* node = new TreeNode("string");
+    TreeNode* child = new TreeNode(token.lexeme);
+    node->left = child;
+    push(node);
 }
 
 // Parse the output expression.
 void Parser::outputExpression() {
     LOG_INFO("Parsing output expression");
     consume(TokensType::Key_output, "output");
-    skipNewlines();
     consume(TokensType::OpenParen, "open parenthesis");
-    skipNewlines();
     stringLiteral();
-    skipNewlines();
     consume(TokensType::CloseParen, "close parenthesis");
     LOG_INFO("Output expression parsed successfully");
     return; // TODO: Update the implementation
@@ -139,6 +144,7 @@ void Parser::statement() {
     switch (peek().type) {
         case TokensType::Key_output:
             outputExpression();
+            buildTree("output", 1);
             break;
         default:
             LOG_ERROR("Expected output expression but found " + peek().toString());
@@ -150,21 +156,26 @@ void Parser::statement() {
 // Parse the body.
 void Parser::body() {
     LOG_INFO("Parsing body");
-    skipNewlines();
     consume(TokensType::Key_begin, "begin");
-    skipNewlines();
     statement();
-    skipNewlines();
-    consume(TokensType::Semicolon, "semicolon");
-    skipNewlines();
+    if (check(TokensType::Semicolon)) {
+        advance();
+    }
     consume(TokensType::Key_end, "end");
+    buildTree("block", 1);
     return; // TODO: Update the implementation
+}
+
+void Parser::program() {
+    LOG_INFO("Parsing program");
+    consume(TokensType::Key_program, "program");
+    push(new TreeNode("program"));
 }
 
 // Parse the WinZigC program.
 void Parser::winzig() {
     LOG_INFO("Parsing WinZigC program");
-    consume(TokensType::Key_program, "program");
+    program();
     identifier();
     consume(TokensType::Colon, "colon");
     consts();
@@ -174,5 +185,34 @@ void Parser::winzig() {
     body();
     identifier();
     consume(TokensType::SingleDot, "single dot");
+    buildTree("program", 7);
     return; // TODO: Update the implementation
 }
+
+
+// ==================== Stack Operations ====================
+
+// Push a node onto the stack.
+void Parser::push(TreeNode* node) {
+    stack.push_back(node);
+}
+
+// Pop a node from the stack.
+TreeNode* Parser::pop() {
+    TreeNode* node = stack.back();
+    stack.pop_back();
+    return node;
+}
+
+
+// Build the tree.
+void Parser::buildTree(std::string x, int n) {
+    TreeNode* parent = nullptr;
+    for (int i = 0; i < n; i++) {
+        TreeNode* child = pop();
+        child->right = parent;
+        parent = child;
+    }
+    push(new TreeNode(std::move(x), parent, nullptr));
+}
+
