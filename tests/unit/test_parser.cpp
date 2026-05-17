@@ -2,10 +2,10 @@
 
 #include <string>
 
-#include "parser.h"
+#include "parser/parser.h"
 #include "utils/filereader.h"
 #include "utils/logger.h"
-#include "utils/tokenizer.h"
+#include "tokenizer/tokenizer.h"
 #include "utils/tree.h"
 
 namespace {

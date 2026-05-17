@@ -1,4 +1,4 @@
-#include "parser.h"
+#include "parser/parser.h"
 /**
  * @file parser.cpp
  * @brief Parser class implementation
@@ -35,12 +35,14 @@ Result<TreeNode*> Parser::parseTree() {
 }
 
 // Parse the WinZigC program.
-Result<void> Parser::parse() {
+Result<void> Parser::parse(bool printAbstractSyntaxTree) {
     auto result = parseTree();
     if (!result.success) {
         return Result<void>::Err(ParserError(result.error_message.value_or("parse failed")));
     }
-    printTree(result.value.value(), 0);
+    if (printAbstractSyntaxTree) {
+        printTree(result.value.value(), 0);
+    }
     return Result<void>::Ok();
 }
 
@@ -76,7 +78,7 @@ Token Parser::advance() {
 Token Parser::consume(TokensType type,const std::string& what) {
     if(check(type)) {
         Token token = advance();
-        LOG_INFO("Consumed " + what + ": " + token.toString());
+        LOG_DEBUG("Consumed " + what + ": " + token.toString());
         return token;
     }
     LOG_ERROR("Expected " + what + " but found " + peek().toString());
@@ -93,7 +95,7 @@ Token Parser::consume(TokensType type,const std::string& what) {
 * @return void
 */
 void Parser::consts() {
-    LOG_INFO("Parsing constants");
+    LOG_DEBUG("Parsing constants");
     // Parsing const ->  
     // Check for actually are there any consts in the program
     if(!check(TokensType::Key_const)) {
@@ -123,7 +125,7 @@ void Parser::consts() {
 * @return void
 */
 void Parser::constDeclaration() {
-    LOG_INFO("Parsing const declaration");
+    LOG_DEBUG("Parsing const declaration");
     // Parsing const -> identifier '=' constValue
     identifier();
     consume(TokensType::Equal, "equal"); // consume the equal sign
@@ -138,7 +140,7 @@ void Parser::constDeclaration() {
 * @return void
 */
 void Parser::constValue() {
-    LOG_INFO("Parsing const value");
+    LOG_DEBUG("Parsing const value");
     // Parsing const value -> integerLiteral | charLiteral | identifier
     switch (peek().type) {
         case TokensType::IntegerLiteral:
@@ -173,7 +175,7 @@ void Parser::constValue() {
 void Parser::identifier() {
     if(check(TokensType::Identifier)) {
         Token token = advance();
-        LOG_INFO("Identifier found: " + token.toString());
+        LOG_DEBUG("Identifier found: " + token.toString());
         TreeNode* node = new TreeNode("<identifier>");
         TreeNode* child = new TreeNode(token.lexeme);
         node->left = child;
@@ -192,7 +194,7 @@ void Parser::identifier() {
 * @return void
 */
 void Parser::types() {
-    LOG_INFO("Parsing types");
+    LOG_DEBUG("Parsing types");
     // Check if there are any types in the program
     if(!check(TokensType::Key_type)) {
         // If there are no types in the program, push a types node to the stack
@@ -219,7 +221,7 @@ void Parser::types() {
 * @return void
 */
 void Parser::typeDeclaration() {
-    LOG_INFO("Parsing type declaration");
+    LOG_DEBUG("Parsing type declaration");
     identifier();
     consume(TokensType::Equal, "equal");
     litlist();
@@ -235,7 +237,7 @@ void Parser::typeDeclaration() {
 * @return void
 */
 void Parser::litlist() {
-    LOG_INFO("Parsing litlist");
+    LOG_DEBUG("Parsing litlist");
     consume(TokensType::OpenParen, "open parenthesis"); // consume the open parenthesis
     identifier(); // parse the identifier
     int n = 1;
@@ -256,7 +258,7 @@ void Parser::litlist() {
 * @return void
 */
 void Parser::subprogs() {
-    LOG_INFO("Parsing subprograms");
+    LOG_DEBUG("Parsing subprograms");
     // Check if there are any subprograms in the program
     if(!check(TokensType::Key_function)) {
         // If there are no subprograms in the program, push a subprogs node to the stack
@@ -286,7 +288,7 @@ void Parser::subprogs() {
 * @return void
 */
 void Parser::fcn() {
-    LOG_INFO("Parsing fcn");
+    LOG_DEBUG("Parsing fcn");
     // Parsing fcn -> 'function' <identifier> '(' Params ')' ':' <identifier> ';' Consts Types Dclns Body Name ';'
     consume(TokensType::Key_function, "function");
     identifier();
@@ -313,7 +315,7 @@ void Parser::fcn() {
 * @return void
 */
 void Parser::params() {
-    LOG_INFO("Parsing params");
+    LOG_DEBUG("Parsing params");
     // Parsing params -> Dcln list ';'
     dcln();
     int n = 1;
@@ -333,7 +335,7 @@ void Parser::params() {
 * @return void
 */
 void Parser::dcln() {
-    LOG_INFO("Parsing dcln");
+    LOG_DEBUG("Parsing dcln");
     identifier();
     int n = 1;
     while (check(TokensType::Comma)) {
@@ -355,7 +357,7 @@ void Parser::dcln() {
 * @return void
 */
 void Parser::dclns() {
-    LOG_INFO("Parsing declarations");
+    LOG_DEBUG("Parsing declarations");
     // Check if there are any declarations in the program
     if(!check(TokensType::Key_var)) {
         // If there are no declarations in the program, push a dclns node to the stack
@@ -382,7 +384,7 @@ void Parser::dclns() {
 * @return void
 */
 void Parser::body() {
-    LOG_INFO("Parsing body");
+    LOG_DEBUG("Parsing body");
     consume(TokensType::Key_begin, "begin");
     // Check if the body is empty
     if (check(TokensType::Key_end)) {
@@ -439,7 +441,7 @@ void Parser::body() {
 * @return void
 */
 void Parser::statement() {
-    LOG_INFO("Parsing statement");
+    LOG_DEBUG("Parsing statement");
     // Check if the statement is empty
     if (!(check(TokensType::Identifier) || check(TokensType::Key_output) || check(TokensType::Key_if) || check(TokensType::Key_while) || check(TokensType::Key_repeat) || check(TokensType::Key_for) || check(TokensType::Key_loop) || check(TokensType::Key_case) || check(TokensType::Key_read) || check(TokensType::Key_exit) || check(TokensType::Key_return) || check(TokensType::Key_begin))) {
         // If the statement is empty, push a null node to the stack
@@ -606,7 +608,7 @@ void Parser::statement() {
 * @return void
 */
 void Parser::caseclauses() {
-    LOG_INFO("Parsing case clauses");
+    LOG_DEBUG("Parsing case clauses");
     // Parsing CaseClauses -> (CaseClause ';')+
     caseclause(); // parse the case clause
     while (check(TokensType::Semicolon)) {
@@ -626,7 +628,7 @@ void Parser::caseclauses() {
 * @return void
 */
 void Parser::caseclause() {
-    LOG_INFO("Parsing case clause");
+    LOG_DEBUG("Parsing case clause");
     caseexpression();
     int n = 1;
     while(check(TokensType::Comma)) {
@@ -647,7 +649,7 @@ void Parser::caseclause() {
 * @return void
 */
 void Parser::caseexpression() {
-    LOG_INFO("Parsing case expression");
+    LOG_DEBUG("Parsing case expression");
     // Since both case expression and const value start with a const value, parse the const value
     // Parsing CaseExpression -> ConstValue
     constValue();
@@ -686,7 +688,7 @@ void Parser::otherwiseclause() {
 * @return void
 */
 void Parser::forstatement() {
-    LOG_INFO("Parsing for statement");
+    LOG_DEBUG("Parsing for statement");
     // Check if the for statement is empty
     if(!check(TokensType::Identifier)) {
         // Parsing ForStatement -> <null>
@@ -724,7 +726,7 @@ void Parser::forexpression() {
 * @return void
 */
 void Parser::assignment() {
-    LOG_INFO("Parsing assignment");
+    LOG_DEBUG("Parsing assignment");
     // Parsing Identifier since both assignment and swap start with an identifier
     identifier();
 
@@ -767,7 +769,7 @@ void Parser::assignment() {
 * @return void
 */
 void Parser::expression() {
-    LOG_INFO("Parsing expression");
+    LOG_DEBUG("Parsing expression");
     // Parsing Expression -> Term
     // Parse term since all expressions start with a term
     term();
@@ -824,7 +826,7 @@ void Parser::expression() {
 * @return void
 */
 void Parser::term() {
-    LOG_INFO("Parsing term");
+    LOG_DEBUG("Parsing term");
     // Parsing Term -> Factor
     factor();
     while(
@@ -866,7 +868,7 @@ void Parser::term() {
 * @return void
 */
 void Parser::factor() {
-    LOG_INFO("Parsing factor");
+    LOG_DEBUG("Parsing factor");
     // Parsing Factor -> Primary
     primary(); // parse the primary
 
@@ -1058,7 +1060,7 @@ void Parser::outexp() {
 * @return void
 */
 void Parser::stringLiteral() {
-    LOG_INFO("Parsing string literal");
+    LOG_DEBUG("Parsing string literal");
     // Parsing StringLiteral -> '<string>'
     Token token = consume(TokensType::String, "string literal");
     TreeNode* node = new TreeNode("<string>");
@@ -1075,7 +1077,7 @@ void Parser::stringLiteral() {
 * @return void
 */
 void Parser::integerLiteral() {
-    LOG_INFO("Parsing integer literal");
+    LOG_DEBUG("Parsing integer literal");
     // Parsing IntegerLiteral -> '<integer>'
     Token token = consume(TokensType::IntegerLiteral, "integer literal");
     TreeNode* node = new TreeNode("<integer>");
@@ -1092,7 +1094,7 @@ void Parser::integerLiteral() {
 * @return void
 */
 void Parser::charLiteral() {
-    LOG_INFO("Parsing char literal");
+    LOG_DEBUG("Parsing char literal");
     // Parsing CharLiteral -> '<char>'
     Token token = consume(TokensType::CharLiteral, "char literal");
     TreeNode* node = new TreeNode("<char>");
@@ -1111,7 +1113,7 @@ void Parser::charLiteral() {
 * @return void
 */
 void Parser::winzig() {
-    LOG_INFO("Parsing WinZigC program");
+    LOG_DEBUG("Parsing WinZigC program");
     consume(TokensType::Key_program, "program"); // consume the program keyword
     identifier(); // parse the identifier
     consume(TokensType::Colon, "colon");

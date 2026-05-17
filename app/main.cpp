@@ -5,8 +5,8 @@
 #include "utils/logger.h"
 #include "utils/argparser.h"
 #include "utils/filereader.h"
-#include "utils/tokenizer.h"
-#include "parser.h"
+#include "tokenizer/tokenizer.h"
+#include "parser/parser.h"
 
 int main(int argc, char** argv) {
     Logger::init("WinZigCParser");
@@ -19,7 +19,7 @@ int main(int argc, char** argv) {
     if (result.showVersion) {
         return 0;   
     }
-    LOG_INFO("WinZigCParser started");
+    LOG_DEBUG("WinZigCParser started");
     auto fileReader = FileReader(result.inputFile);
     auto fileReaderResult = fileReader.read();
     if (!fileReaderResult.success) {
@@ -37,16 +37,16 @@ int main(int argc, char** argv) {
         return 1;
     }
     for (const auto& token : toks.value.value()) {
-        LOG_INFO("Token: " + token.toString());
+        LOG_DEBUG("Token: " + token.toString());
     }
 
-    LOG_INFO("Tokenizing successful");
+    LOG_DEBUG("Tokenizing successful");
     auto parser = Parser(toks.value.value());
-    auto parserResult = parser.parse();
+    auto parserResult = parser.parse(result.printAbstractSyntaxTree);
     if (!parserResult.success) {
         LOG_ERROR(parserResult.error_message.value());
         return 1;
     }
-    LOG_INFO("Parser parsed successfully");
+    LOG_DEBUG("Parser parsed successfully");
     return 0;
 }

@@ -2,10 +2,11 @@
 
 ArgParser::ArgParser(int argc, char** argv)
     : _argc(argc), _argv(argv), _app(std::make_unique<CLI::App>()) {
-    _app->add_flag("--version", _version, "Print version and exit");
+    _app->add_flag("-v,--version", _version, "Print version and exit");
     _logLevelOpt = _app->add_option("-l,--log-level", _logLevelStr, "Set log level");
     _app->add_option("-i,--input-file", _inputFileStr, "Set input file");
     _app->add_option("-o,--output-file", _outputFileStr, "Set output file");
+    _app->add_flag("-a,--ast", _abstractSyntaxTree, "Print Abstract Syntax Tree");
     auto* inputOpt = _app->add_option("input", _inputFileStr, "Input file");
     inputOpt->required(false);
 }
@@ -17,11 +18,22 @@ Result<ArgParserResult> ArgParser::parse() {
         return Result<ArgParserResult>::Err(ArgParserError(e.what()));
     }
 
+    bool printAbstractSyntaxTree = false;
+
     if (_version) {
-        LOG_INFO("WinZigCParser version 0.1");
+        std::cout << "WinZigC version " << WINZIG_VERSION << std::endl;
+        std::cout << "Compiler: " << WINZIG_COMPILER << std::endl;
+        std::cout << "Git hash: " << WINZIG_GIT_HASH << std::endl;
+        std::cout << "Platform: " << WINZIG_PLATFORM << std::endl;
+        std::cout << "Build on: " << WINZIG_BUILD_TIME << std::endl;
         ArgParserResult r("", "");
         r.showVersion = true;
         return Result<ArgParserResult>::Ok(std::move(r));
+    }
+
+    if (_abstractSyntaxTree) {
+        LOG_DEBUG("Abstract Syntax Tree will be printed");
+        printAbstractSyntaxTree = true;
     }
 
     if (_logLevelOpt && _logLevelOpt->count() > 0) {
@@ -48,7 +60,7 @@ Result<ArgParserResult> ArgParser::parse() {
     }
 
     std::string output = _outputFileStr.empty() ? "output.txt" : _outputFileStr;
-    return Result<ArgParserResult>::Ok(ArgParserResult(_inputFileStr, output));
+    return Result<ArgParserResult>::Ok(ArgParserResult(_inputFileStr, output, printAbstractSyntaxTree));
 }
 
 ArgParser::~ArgParser() = default;

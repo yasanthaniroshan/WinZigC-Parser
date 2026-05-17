@@ -46,10 +46,10 @@ or run the test binary directly:
 
 ### Run the parser
 
-The `parser` target links the `utils` library. Ensure a `logs` directory exists if file logging is enabled (the logger writes under `logs/`).
+The `winzigc` executable links the `parser` and `utils` libraries. Ensure a `logs` directory exists if file logging is enabled (the logger writes under `logs/`).
 
 ```bash
-./build/parser --version
+./build/winzigc --version
 ```
 
 ### Coverage (GCC / Clang only)

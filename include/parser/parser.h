@@ -4,8 +4,8 @@
 #include "common/result.h"
 #include "common/error.h"
 #include "utils/logger.h"
-#include "utils/tokenizer.h"
 #include "utils/tree.h"
+#include "tokenizer/tokenizer.h"
 
 struct ParserError : public Error {
     std::string msg;
@@ -17,7 +17,7 @@ class Parser {
 public:
     Parser(const std::vector<Token>& tokens);
     ~Parser();
-    Result<void> parse();
+    Result<void> parse(bool printAbstractSyntaxTree = false);
     Result<TreeNode*> parseTree();
 
 private:

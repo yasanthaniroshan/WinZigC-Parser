@@ -9,7 +9,7 @@ protected:
 };
 
 TEST_F(ArgParserTest, VersionFlag) {
-    const char* argv[] = {"parser", "--version"};
+    const char* argv[] = {"winzigc", "--version"};
     int argc = 2;
     auto r = ArgParser(argc, (char**)argv).parse();
     ASSERT_TRUE(r.success);
@@ -20,7 +20,7 @@ TEST_F(ArgParserTest, VersionFlag) {
 }
 
 TEST_F(ArgParserTest, LogLevelOption) {
-    const char* argv[] = {"parser", "-l", "DEBUG", "input.txt"};
+    const char* argv[] = {"winzigc", "-l", "DEBUG", "input.txt"};
     int argc = 4;
     auto expected = Result<ArgParserResult>::Ok(ArgParserResult("input.txt", "output.txt"));
     EXPECT_EQ(ArgParser(argc, (char**)argv).parse(), expected);
@@ -28,7 +28,7 @@ TEST_F(ArgParserTest, LogLevelOption) {
 }
 
 TEST_F(ArgParserTest, InvalidLogLevelOption) {
-    const char* argv[] = {"parser", "-l", "INVALID"};
+    const char* argv[] = {"winzigc", "-l", "INVALID"};
     int argc = 3;
     EXPECT_EQ(ArgParser(argc, (char**)argv).parse(),
               Result<ArgParserResult>::Err(ArgParserError("Invalid log level: INVALID")));
