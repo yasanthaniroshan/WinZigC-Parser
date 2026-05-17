@@ -79,7 +79,7 @@ void Parser::identifier() {
     if(check(TokensType::Identifier)) {
         Token token = advance();
         LOG_INFO("Identifier found: " + token.toString());
-        TreeNode* node = new TreeNode("identifier");
+        TreeNode* node = new TreeNode("<identifier>");
         TreeNode* child = new TreeNode(token.lexeme);
         node->left = child;
         push(node);
@@ -89,11 +89,75 @@ void Parser::identifier() {
     return; // TODO: Update the implementation
 }
 
-// Parse the consts.
+/**
+ * @brief Parses the consts statement.
+ * @details following the grammar is parsed,
+    * consts -> 'const' Const list ',' ';'
+    * consts ->
+ * @return void
+ */
 void Parser::consts() {
     LOG_INFO("Parsing constants");
-    push(new TreeNode("consts"));
-    return; // TODO: Implement
+    // Parsing const ->  
+    // Check for actually are there any consts in the program
+    if(!check(TokensType::Key_const)) {
+        // If there are no consts in the program, push a consts node to the stack
+        push(new TreeNode("consts"));
+        return; 
+    }
+    // If there any consts in this program, parse the consts
+    // consts -> 'const' Const list ',' ';'
+    consume(TokensType::Key_const, "const");
+    constDeclaration(); // Parse the const declaration
+    int n = 1;
+    while (check(TokensType::Comma)) {
+        advance(); // consume the comma
+        constDeclaration(); // parse the const declaration
+        n++; // increment the number of const declarations
+    }
+    buildTree("consts", n); // Build the tree for the consts statement
+    consume(TokensType::Semicolon, "semicolon"); // consume the semicolon
+    return; // TODO: Need to handle errors here
+}
+
+/**
+ * @brief Parses the const declaration.
+ * @details following the grammar is parsed,
+ * constDeclaration -> identifier '=' constValue
+ * @return void
+ */
+void Parser::constDeclaration() {
+    LOG_INFO("Parsing const declaration");
+    // Parsing const -> identifier '=' constValue
+    identifier();
+    consume(TokensType::Equal, "equal"); // consume the equal sign
+    constValue();
+    buildTree("const", 2); // Build the tree for the const declaration
+    return; // TODO: Need to handle errors here
+}
+
+void Parser::constValue() {
+    LOG_INFO("Parsing const value");
+    switch (peek().type) {
+        case TokensType::IntegerLiteral:
+        {
+            integerLiteral();
+            break;
+        }
+        case TokensType::CharLiteral:
+        {
+            charLiteral();
+            break;
+        }
+        case TokensType::Identifier:
+        {
+            identifier();
+            break;
+        }
+        default:
+            LOG_ERROR("Expected integer literal or string but found " + peek().toString());
+            return;
+    }
 }
 
 // Parse the types.
@@ -127,6 +191,23 @@ void Parser::stringLiteral() {
     push(node);
 }
 
+void Parser::integerLiteral() {
+    LOG_INFO("Parsing integer literal");
+    Token token = consume(TokensType::IntegerLiteral, "integer literal");
+    TreeNode* node = new TreeNode("<integer>");
+    TreeNode* child = new TreeNode(token.lexeme);
+    node->left = child;
+    push(node);
+}
+
+void Parser::charLiteral() {
+    LOG_INFO("Parsing char literal");
+    Token token = consume(TokensType::CharLiteral, "char literal");
+    TreeNode* node = new TreeNode("<char>");
+    TreeNode* child = new TreeNode(token.lexeme);
+    node->left = child;
+    push(node);
+}
 // Parse the output expression.
 void Parser::outputExpression() {
     LOG_INFO("Parsing output expression");

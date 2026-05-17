@@ -39,7 +39,11 @@ private:
     // Parsing functions
     void winzig(); // Entry point for parsing the WinZigC program.
     void program(); // Parse the program statement.
+
     void consts(); // Parse the consts statement.
+    void constDeclaration(); // Parse the const declaration.
+    void constValue(); // Parse the const value.
+    
     void types(); // Parse the types statement.
     void dclns(); // Parse the dclns statement.
     void subprogs(); // Parse the subprogs statement.
@@ -48,6 +52,9 @@ private:
     void identifier(); // Parse the identifier.
     void outputExpression(); // Parse the output expression.
     void stringLiteral(); // Parse the string literal.
+
+    void integerLiteral(); // Parse the integer literal.
+    void charLiteral(); // Parse the char literal.
 
     // Stack Operations
     void push(TreeNode* node); // Push a node onto the stack.
