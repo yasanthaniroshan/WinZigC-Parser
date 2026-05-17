@@ -1,0 +1,4 @@
+program t:
+begin
+  loop ; pool;
+end t.

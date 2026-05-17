@@ -1,0 +1,10 @@
+program t:
+
+function F ( x : integer ) : integer;
+const C = 1;
+begin
+return(C);
+end F;
+
+begin
+end t.

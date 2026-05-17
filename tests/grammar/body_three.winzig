@@ -1,0 +1,6 @@
+program t:
+begin
+  output(1);
+  output(2);
+  exit;
+end t.

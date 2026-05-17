@@ -1,0 +1,5 @@
+program t:
+type
+    Quad = ( a, b, c, d );
+begin
+end t.

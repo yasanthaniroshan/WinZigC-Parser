@@ -1,0 +1,5 @@
+program t:
+var a : integer;
+    b : integer;
+begin
+end t.

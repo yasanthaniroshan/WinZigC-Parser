@@ -1,0 +1,6 @@
+program t:
+const Max = 99;
+type
+    Level = ( low, high );
+begin
+end t.

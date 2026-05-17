@@ -1,0 +1,5 @@
+program t:
+type
+    Pair = ( first, second );
+begin
+end t.

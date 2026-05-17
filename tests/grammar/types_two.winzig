@@ -1,0 +1,6 @@
+program t:
+type
+    A = ( one );
+    B = ( two );
+begin
+end t.

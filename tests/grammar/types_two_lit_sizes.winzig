@@ -1,0 +1,6 @@
+program t:
+type
+    Pair = ( one, two );
+    Triple = ( a, b, c );
+begin
+end t.

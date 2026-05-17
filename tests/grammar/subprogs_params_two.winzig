@@ -1,0 +1,9 @@
+program t:
+
+function F ( a : integer; b : integer ) : integer;
+begin
+return(a);
+end F;
+
+begin
+end t.

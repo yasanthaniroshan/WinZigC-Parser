@@ -1,0 +1,8 @@
+program t:
+
+function F ( a, b, c : integer ) : integer;
+begin
+end F;
+
+begin
+end t.

@@ -1,0 +1,16 @@
+program t:
+
+function F ( x : integer ) : integer;
+begin
+end F;
+
+function G ( y : integer ) : integer;
+begin
+end G;
+
+function H ( z : integer ) : integer;
+begin
+end H;
+
+begin
+end t.

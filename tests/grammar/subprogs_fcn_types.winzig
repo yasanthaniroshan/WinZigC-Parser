@@ -1,0 +1,11 @@
+program t:
+
+function F ( x : integer ) : integer;
+type
+    E = ( a, b );
+begin
+return(0);
+end F;
+
+begin
+end t.
