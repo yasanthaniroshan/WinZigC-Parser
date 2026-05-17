@@ -6,6 +6,7 @@
 #include "utils/argparser.h"
 #include "utils/filereader.h"
 #include "utils/tokenizer.h"
+#include "parser.h"
 
 int main(int argc, char** argv) {
     Logger::init("WinZigCParser");
@@ -39,6 +40,13 @@ int main(int argc, char** argv) {
         LOG_INFO("Token: " + token.toString());
     }
 
-    LOG_INFO("File read successfully: " + fileReaderResult.value.value().content);
+    LOG_INFO("Tokenizing successful");
+    auto parser = Parser(toks.value.value());
+    auto parserResult = parser.parse();
+    if (!parserResult.success) {
+        LOG_ERROR(parserResult.error_message.value());
+        return 1;
+    }
+    LOG_INFO("Parser parsed successfully");
     return 0;
 }

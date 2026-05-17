@@ -181,8 +181,8 @@ Result<Token> Tokenizer::nextToken() {
 
         // Newline
         if (c == '\n') {
-            advance();
-            return Result<Token>::Ok(Token(TokensType::Newline, "\n", startLine, startColumn));
+            skipNewlines();
+            continue;
         }
 
         // Single-line comment
@@ -403,4 +403,8 @@ void Tokenizer::skipLineComment() {
         else break;
     }
     // advance(); // We don't consume the final newline character.
+}
+
+void Tokenizer::skipNewlines() {
+    while (!isAtEnd() && peek() == '\n') advance();
 }
