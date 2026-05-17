@@ -45,6 +45,9 @@ private:
     void constValue(); // Parse the const value.
     
     void types(); // Parse the types statement.
+    void typeDeclaration(); // Parse the type declaration.
+    void litlist(); // Parse the litlist.
+     
     void dclns(); // Parse the dclns statement.
     void subprogs(); // Parse the subprogs statement.
     void body(); // Parse the body statement.

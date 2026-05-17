@@ -74,28 +74,13 @@ Token Parser::consume(TokensType type,const std::string& what) {
 
 // ==================== Parsing Functions ====================
 
-// Parse the identifier.
-void Parser::identifier() {
-    if(check(TokensType::Identifier)) {
-        Token token = advance();
-        LOG_INFO("Identifier found: " + token.toString());
-        TreeNode* node = new TreeNode("<identifier>");
-        TreeNode* child = new TreeNode(token.lexeme);
-        node->left = child;
-        push(node);
-        return; // TODO: Update the implementation
-    }
-    LOG_ERROR("Expected identifier but found " + peek().toString());
-    return; // TODO: Update the implementation
-}
-
 /**
- * @brief Parses the consts statement.
- * @details following the grammar is parsed,
-    * consts -> 'const' Const list ',' ';'
-    * consts ->
- * @return void
- */
+* @brief Parses the consts statement.
+* @details following the grammar is parsed,
+* consts -> 'const' Const list ',' ';'
+* consts ->
+* @return void
+*/
 void Parser::consts() {
     LOG_INFO("Parsing constants");
     // Parsing const ->  
@@ -121,11 +106,11 @@ void Parser::consts() {
 }
 
 /**
- * @brief Parses the const declaration.
- * @details following the grammar is parsed,
- * constDeclaration -> identifier '=' constValue
- * @return void
- */
+* @brief Parses the const declaration.
+* @details following the grammar is parsed,
+* constDeclaration -> identifier '=' constValue
+* @return void
+*/
 void Parser::constDeclaration() {
     LOG_INFO("Parsing const declaration");
     // Parsing const -> identifier '=' constValue
@@ -135,35 +120,128 @@ void Parser::constDeclaration() {
     buildTree("const", 2); // Build the tree for the const declaration
     return; // TODO: Need to handle errors here
 }
-
+/**
+* @brief Parses the const value.
+* @details following the grammar is parsed,
+* constValue -> integerLiteral | charLiteral | identifier
+* @return void
+*/
 void Parser::constValue() {
     LOG_INFO("Parsing const value");
+    // Parsing const value -> integerLiteral | charLiteral | identifier
     switch (peek().type) {
         case TokensType::IntegerLiteral:
         {
+            // Parsing integer literal -> integerLiteral
             integerLiteral();
             break;
         }
         case TokensType::CharLiteral:
         {
+            // Parsing char literal -> charLiteral
             charLiteral();
             break;
         }
         case TokensType::Identifier:
         {
+            // Parsing identifier -> identifier
             identifier();
             break;
         }
         default:
-            LOG_ERROR("Expected integer literal or string but found " + peek().toString());
-            return;
+        LOG_ERROR("Expected integer literal or string but found " + peek().toString());
+        return;
     }
 }
+/**
+* @brief Parses the identifier.
+* @details following the grammar is parsed,
+* identifier -> Identifier
+* @return void
+*/
+void Parser::identifier() {
+    if(check(TokensType::Identifier)) {
+        Token token = advance();
+        LOG_INFO("Identifier found: " + token.toString());
+        TreeNode* node = new TreeNode("<identifier>");
+        TreeNode* child = new TreeNode(token.lexeme);
+        node->left = child;
+        push(node);
+        return; // TODO: Need to handle errors here
+    }
+    LOG_ERROR("Expected identifier but found " + peek().toString());
+    return; // TODO: Need to handle errors here
+}
 
-// Parse the types.
+/**
+* @brief Parses the types.
+* @details following the grammar is parsed,
+* types -> 'type' Type list ';'
+* types ->
+* @return void
+*/
 void Parser::types() {
     LOG_INFO("Parsing types");
-    push(new TreeNode("types"));
+    // Check if there are any types in the program
+    if(!check(TokensType::Key_type)) {
+        // If there are no types in the program, push a types node to the stack
+        // Parsing types -> 
+        push(new TreeNode("types")); 
+        return; // TODO: Need to handle errors here
+    }
+    // If there are types in the program, parse the types
+    consume(TokensType::Key_type, "type"); // consume the type keyword
+    // Parsing types -> 'type' Type list ';'
+    int n = 0;
+    do {
+        typeDeclaration(); // parse the type declaration
+        n++; // increment the number of type declarations
+    } while (check(TokensType::Identifier));
+    buildTree("types", n); // Build the tree for the types statement
+    return; // TODO: Need to handle errors here
+}
+
+/**
+* @brief Parses the type declaration.
+* @details following the grammar is parsed,
+* typeDeclaration -> identifier '=' litlist
+* @return void
+*/
+void Parser::typeDeclaration() {
+    LOG_INFO("Parsing type declaration");
+    identifier();
+    consume(TokensType::Equal, "equal");
+    litlist();
+    consume(TokensType::Semicolon, "semicolon");
+    buildTree("type", 2);
+    return; // TODO: Need to handle errors here
+}
+
+/**
+* @brief Parses the litlist.
+* @details following the grammar is parsed,
+*   litlist -> '(' identifier list ',' ')'
+* @return void
+*/
+void Parser::litlist() {
+    LOG_INFO("Parsing litlist");
+    consume(TokensType::OpenParen, "open parenthesis"); // consume the open parenthesis
+    identifier(); // parse the identifier
+    int n = 1;
+    while (check(TokensType::Comma)) {
+        advance(); // consume the comma
+        identifier(); // parse the identifier
+        n++; // increment the number of identifiers
+    }
+    consume(TokensType::CloseParen, "close parenthesis"); // consume the close parenthesis
+    buildTree("lit", n);
+    return; // TODO: Need to handle errors here
+}
+
+// Parse the subprogs.
+void Parser::subprogs() {
+    LOG_INFO("Parsing subprograms");
+    push(new TreeNode("subprogs"));
     return; // TODO: Implement
 }
 
@@ -174,12 +252,6 @@ void Parser::dclns() {
     return; // TODO: Implement
 }
 
-// Parse the subprogs.
-void Parser::subprogs() {
-    LOG_INFO("Parsing subprograms");
-    push(new TreeNode("subprogs"));
-    return; // TODO: Implement
-}
 
 // Parse the string literal.
 void Parser::stringLiteral() {
@@ -250,7 +322,6 @@ void Parser::body() {
 void Parser::program() {
     LOG_INFO("Parsing program");
     consume(TokensType::Key_program, "program");
-    push(new TreeNode("program"));
 }
 
 // Parse the WinZigC program.
