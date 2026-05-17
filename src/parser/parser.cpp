@@ -352,9 +352,10 @@ void Parser::dclns() {
     consume(TokensType::Key_var, "var");
     int n = 0;
     do {
-        dcln(); // parse the dcln
-        n++; // increment the number of dclns
-    } while (!check(TokensType::Identifier));
+        dcln();
+        consume(TokensType::Semicolon, "semicolon");
+        n++; // increment the number of dcln
+    } while (check(TokensType::Identifier));
     buildTree("dclns", n); // Build the tree for the dclns statement
     return; // TODO: Need to handle errors here
 }

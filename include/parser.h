@@ -51,8 +51,8 @@ private:
     void subprogs(); // Parse the subprogs statement.
     void fcn(); // Parse the fcn statement.
     void params(); // Parse the params statement.
-    void dclns(); // Parse the dclns statement.
     void dcln(); // Parse the dcln statement.
+    void dclns(); // Parse the dclns statement.
 
     void body(); // Parse the body statement.
     void statement(); // Parse the statement.
