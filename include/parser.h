@@ -39,7 +39,6 @@ private:
     
     // Parsing functions
     void winzig(); // Entry point for parsing the WinZigC program.
-    void program(); // Parse the program statement.
 
     void consts(); // Parse the consts statement.
     void constDeclaration(); // Parse the const declaration.
@@ -60,6 +59,10 @@ private:
     void forexpression(); // Parse the for expression.
     void assignment(); // Parse the assignment.
     void outexp(); // Parse the output expression.
+    void caseclauses(); // Parse the case clauses.
+    void otherwiseclause(); // Parse the otherwise clause.
+    void caseclause(); // Parse the case clause.
+    void caseexpression(); // Parse the case expression.
 
     void expression(); // Parse the expression.
     void term(); // Parse the term.
@@ -67,7 +70,6 @@ private:
     void primary(); // Parse the primary.
 
     void identifier(); // Parse the identifier.
-    void outputExpression(); // Parse the output expression.
     void stringLiteral(); // Parse the string literal.
 
     void integerLiteral(); // Parse the integer literal.

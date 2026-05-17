@@ -429,13 +429,24 @@ void Parser::body() {
 * statement -> 'while' Expression 'do' Statement
 * statement -> 'repeat' Statement list ';' 'until' Expression
 * statement -> 'for' '(' ForStatement ';' ForExpression ';' ForStatement ')' Statement
+* statement -> 'loop' Statement list ';' 'pool'
+* statement -> 'case' Expression 'of' CaseClauses 'otherwise' CaseExpression 'end'
 * statement -> 'read' '(' Identifier list ',' ')'
 * statement -> 'exit'
 * statement -> 'return' Expression
+* statement -> Body
+* statement -> <null>
 * @return void
 */
 void Parser::statement() {
     LOG_INFO("Parsing statement");
+    // Check if the statement is empty
+    if (!(check(TokensType::Identifier) || check(TokensType::Key_output) || check(TokensType::Key_if) || check(TokensType::Key_while) || check(TokensType::Key_repeat) || check(TokensType::Key_for) || check(TokensType::Key_loop) || check(TokensType::Key_case) || check(TokensType::Key_read) || check(TokensType::Key_exit) || check(TokensType::Key_return) || check(TokensType::Key_begin))) {
+        // If the statement is empty, push a null node to the stack
+        // Parsing statement -> <null>
+        push(new TreeNode("<null>"));
+        return; // TODO: Need to handle errors here
+    }
     switch (peek().type) {
         // Parsing statement -> Assignment
         case TokensType::Identifier:
@@ -516,6 +527,33 @@ void Parser::statement() {
                 buildTree("for", 4);
                 break;
             }
+        // Parsing statement -> 'loop' Statement list ';' 'pool'
+        case TokensType::Key_loop:
+            {
+                consume(TokensType::Key_loop, "loop"); // consume the loop keyword
+                int n = 1;
+                statement();
+                while(check(TokensType::Semicolon)) {
+                    advance(); // consume the semicolon
+                    statement(); // parse the statement
+                    n++; // increment the number of statements
+                }
+                consume(TokensType::Key_pool, "pool");
+                buildTree("loop",n);
+                break;
+            }
+        // Parsing statement -> 'case' Expression 'of' CaseClauses 'otherwise' CaseExpression 'end'
+        case TokensType::Key_case:
+            {
+                consume(TokensType::Key_case, "case"); // consume the case keyword
+                expression(); // parse the expression
+                consume(TokensType::Key_of, "of"); // consume the of keyword
+                caseclauses(); // parse the case clauses
+                otherwiseclause(); // parse the otherwise clause
+                consume(TokensType::Key_end, "end");
+                buildTree("case", 3);
+                break;
+            }
         // Parsing statement -> 'read' '(' Identifier list ',' ')'
         case TokensType::Key_read:
             {
@@ -547,6 +585,12 @@ void Parser::statement() {
                 buildTree("return", 1);
                 break;
             }
+        // Parsing statement -> Body
+        case TokensType::Key_begin:
+            {
+                body();
+                break;
+            }
         default:
             {
             LOG_ERROR("Expected output expression, if expression, while expression, repeat expression, for expression, loop expression, case expression, read expression, exit expression, return expression, or begin expression but found " + peek().toString());
@@ -554,6 +598,85 @@ void Parser::statement() {
             }
     }
 }
+
+/**
+* @brief Parses the case clauses.
+* @details following the grammar is parsed,
+* CaseClauses -> (CaseClause ';')+
+* @return void
+*/
+void Parser::caseclauses() {
+    LOG_INFO("Parsing case clauses");
+    // Parsing CaseClauses -> (CaseClause ';')+
+    caseclause(); // parse the case clause
+    while (check(TokensType::Semicolon)) {
+        advance(); // consume the semicolon
+        if (check(TokensType::Key_end) || check(TokensType::Key_otherwise))
+            break; // if the end or otherwise keyword is found, break the loop
+        caseclause(); // parse the case clause
+    }
+    buildTree("case_clauses", 1); // Build the tree for the case clauses statement
+    return; // TODO: Need to handle errors here
+}
+
+/**
+* @brief Parses the case clause.
+* @details following the grammar is parsed,
+* CaseClause -> CaseExpression list ',' ':' Statement
+* @return void
+*/
+void Parser::caseclause() {
+    LOG_INFO("Parsing case clause");
+    caseexpression();
+    int n = 1;
+    while(check(TokensType::Comma)) {
+        advance(); // consume the comma
+        caseexpression();
+        n++; // increment the number of case expressions
+    }
+    consume(TokensType::Colon, "colon");
+    statement();
+    buildTree("case_clause", n+1);
+    return; // TODO: Need to handle errors here
+}
+/**
+* @brief Parses the case expression.
+* @details following the grammar is parsed,
+* CaseExpression -> ConstValue
+* CaseExpression -> ConstValue '..' ConstValue
+* @return void
+*/
+void Parser::caseexpression() {
+    LOG_INFO("Parsing case expression");
+    // Since both case expression and const value start with a const value, parse the const value
+    // Parsing CaseExpression -> ConstValue
+    constValue();
+    // Check if the case expression is followed by a double dot
+    if(check(TokensType::Dots)) {
+        // Parsing CaseExpression -> ConstValue '..' ConstValue
+        advance(); // consume the double dot
+        constValue();
+        buildTree("..", 2);
+    } else {
+        buildTree("const", 1);
+    }
+    return; // TODO: Need to handle errors here
+}
+
+/**
+* @brief Parses the otherwise clause.
+* @details following the grammar is parsed,
+* OtherwiseClause -> 'otherwise' Expression
+* @return void
+*/
+void Parser::otherwiseclause() {
+    if (!check(TokensType::Key_otherwise))
+        return;  // ε — push nothing
+    consume(TokensType::Key_otherwise, "otherwise");
+    statement();
+    buildTree("otherwise", 1);
+}
+
 
 /**
 * @brief Parses the for statement.
@@ -928,66 +1051,78 @@ void Parser::outexp() {
     }
 }
 
-
-// Parse the string literal.
+/**
+* @brief Parses the string literal.
+* @details following the grammar is parsed,
+* StringLiteral -> '<string>' 
+* @return void
+*/
 void Parser::stringLiteral() {
     LOG_INFO("Parsing string literal");
+    // Parsing StringLiteral -> '<string>'
     Token token = consume(TokensType::String, "string literal");
     TreeNode* node = new TreeNode("<string>");
     TreeNode* child = new TreeNode(token.lexeme);
     node->left = child;
     push(node);
+    return; // TODO: Need to handle errors here
 }
 
+/**
+* @brief Parses the integer literal.
+* @details following the grammar is parsed,
+* IntegerLiteral -> '<integer>'
+* @return void
+*/
 void Parser::integerLiteral() {
     LOG_INFO("Parsing integer literal");
+    // Parsing IntegerLiteral -> '<integer>'
     Token token = consume(TokensType::IntegerLiteral, "integer literal");
     TreeNode* node = new TreeNode("<integer>");
     TreeNode* child = new TreeNode(token.lexeme);
     node->left = child;
     push(node);
+    return; // TODO: Need to handle errors here
 }
 
+/**
+* @brief Parses the char literal.
+* @details following the grammar is parsed,
+* CharLiteral -> '<char>'
+* @return void
+*/
 void Parser::charLiteral() {
     LOG_INFO("Parsing char literal");
+    // Parsing CharLiteral -> '<char>'
     Token token = consume(TokensType::CharLiteral, "char literal");
     TreeNode* node = new TreeNode("<char>");
     TreeNode* child = new TreeNode(token.lexeme);
     node->left = child;
     push(node);
-}
-// Parse the output expression.
-void Parser::outputExpression() {
-    LOG_INFO("Parsing output expression");
-    consume(TokensType::Key_output, "output");
-    consume(TokensType::OpenParen, "open parenthesis");
-    stringLiteral();
-    consume(TokensType::CloseParen, "close parenthesis");
-    LOG_INFO("Output expression parsed successfully");
-    return; // TODO: Update the implementation
+    return; // TODO: Need to handle errors here
 }
 
 
 
-void Parser::program() {
-    LOG_INFO("Parsing program");
-    consume(TokensType::Key_program, "program");
-}
-
-// Parse the WinZigC program.
+/**
+* @brief Parses the WinZigC program.
+* @details following the grammar is parsed,
+* WinZig -> 'program' Identifier ':' Consts Types Dclns Subprogs Body Identifier '.'
+* @return void
+*/
 void Parser::winzig() {
     LOG_INFO("Parsing WinZigC program");
-    program();
-    identifier();
+    consume(TokensType::Key_program, "program"); // consume the program keyword
+    identifier(); // parse the identifier
     consume(TokensType::Colon, "colon");
-    consts();
-    types();
-    dclns();
-    subprogs();
-    body();
-    identifier();
+    consts(); // parse the consts
+    types(); // parse the types
+    dclns(); // parse the declarations
+    subprogs(); // parse the subprograms
+    body(); // parse the body
+    identifier(); // parse the identifier
     consume(TokensType::SingleDot, "single dot");
-    buildTree("program", 7);
+    buildTree("program", 7); // Build the tree for the WinZigC program
     return; // TODO: Update the implementation
 }
 
