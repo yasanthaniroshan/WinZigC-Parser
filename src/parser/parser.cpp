@@ -15,9 +15,9 @@ Parser::Parser(const std::vector<Token>& tokens) : tokens(tokens) {}
 
 // Destructor for the Parser class.
 Parser::~Parser() {
-    for (TreeNode* node : stack) {
-        delete node;
-    }
+    // for (TreeNode* node : stack) {
+    //     delete node;
+    // }
 }
 
 // ==================== Helper Functions ====================
@@ -256,10 +256,14 @@ void Parser::subprogs() {
     // If there are subprograms in the program, parse the subprograms
     // subprogs -> Fcn
     int n = 0;
-    do {
+    // do {
+    //     fcn(); // parse the function declaration
+    //     n++; // increment the number of function declarations
+    // } while (check(TokensType::Identifier));
+    while(check(TokensType::Key_function)) {
         fcn(); // parse the function declaration
         n++; // increment the number of function declarations
-    } while (check(TokensType::Identifier));
+    }
     buildTree("subprogs", n); // Build the tree for the subprograms statement
     return; // TODO: Need to handle errors here
 }
@@ -287,7 +291,7 @@ void Parser::fcn() {
     body();
     identifier();
     consume(TokensType::Semicolon, "semicolon");
-    buildTree("fcn", 9);
+    buildTree("fcn", 8);
     return; // TODO: Need to handle errors here
 }
 
@@ -328,7 +332,7 @@ void Parser::dcln() {
     }
     consume(TokensType::Colon, "colon");
     identifier();
-    buildTree("var", n);
+    buildTree("var", n+1);
     return; // TODO: Need to handle errors here
 }
 
@@ -360,12 +364,510 @@ void Parser::dclns() {
     return; // TODO: Need to handle errors here
 }
 
+/**
+* @brief Parses the body.
+* @details following the grammar is parsed,
+* body -> 'begin' Statement list ';' 'end'
+* @return void
+*/
+void Parser::body() {
+    LOG_INFO("Parsing body");
+    consume(TokensType::Key_begin, "begin");
+    // Check if the body is empty
+    if (check(TokensType::Key_end)) {
+        // If the body is empty, push a block node to the stack
+        // Parsing body -> 'begin' 'end'
+        consume(TokensType::Key_end, "end"); // consume the end keyword
+        buildTree("block", 0);
+        return; // TODO: Need to handle errors here
+    }
+    // If the body is not empty, parse the body
+    // Parsing body -> 'begin' Statement list ';' 'end'
+    int n = 0;
+    while(
+        check(TokensType::Identifier) ||
+        check(TokensType::Key_output) ||
+        check(TokensType::Key_if) ||
+        check(TokensType::Key_while) ||
+        check(TokensType::Key_repeat) ||
+        check(TokensType::Key_for) ||
+        check(TokensType::Key_loop) ||
+        check(TokensType::Key_case) ||
+        check(TokensType::Key_read) ||
+        check(TokensType::Key_exit) ||
+        check(TokensType::Key_return) ||
+        check(TokensType::Key_begin)
+    ) {
+        // Parse the statement
+        statement();
+        if(check(TokensType::Semicolon)) {
+            advance(); // consume the semicolon
+        }
+        n++; // increment the number of statements
+    }
+    consume(TokensType::Key_end, "end"); // consume the end keyword
+    buildTree("block", n); // Build the tree for the body statement
+    return; // TODO: Need to handle errors here
+} 
+/**
+* @brief Parses the statement.
+* @details following the grammar is parsed,
+* statement -> Assignment
+* statement -> 'output'  '(' OutExp list ',' ')'
+* statement -> 'if' Expression 'then' Statement ('else' Statement)?
+* statement -> 'while' Expression 'do' Statement
+* statement -> 'repeat' Statement list ';' 'until' Expression
+* statement -> 'read' '(' Identifier list ',' ')'
+* statement -> 'exit'
+* statement -> 'return' Expression
+* @return void
+*/
+void Parser::statement() {
+    LOG_INFO("Parsing statement");
+    switch (peek().type) {
+        // Parsing statement -> Assignment
+        case TokensType::Identifier:
+            {
+                assignment();
+                break;
+            }
+        // Parsing statement -> 'output'  '(' OutExp list ',' ')'
+        case TokensType::Key_output:
+            {
+                consume(TokensType::Key_output, "output");
+                consume(TokensType::OpenParen, "open parenthesis");
+                int n = 1;
+                outexp(); // parse the output expression
+                while(check(TokensType::Comma)) {
+                    advance(); // consume the comma
+                    outexp(); // parse the output expression
+                    n++; // increment the number of output expressions
+                }
+                consume(TokensType::CloseParen, "close parenthesis");
+                buildTree("output",n);
+                break;
+            }
+        // Parsing statement -> 'if' Expression 'then' Statement ('else' Statement)?
+        case TokensType::Key_if:
+            {
+                consume(TokensType::Key_if, "if"); // consume the if keyword
+                expression(); // parse the expression
+                consume(TokensType::Key_then, "then"); // consume the then keyword
+                statement();
+                if(check(TokensType::Key_else)) {
+                    advance(); // consume the else keyword
+                    statement();
+                    buildTree("if", 3);
+                } else {
+                    buildTree("if", 2);
+                }
+                break;
+            }
+        // Parsing statement -> 'while' Expression 'do' Statement
+        case TokensType::Key_while:
+            {
+                consume(TokensType::Key_while, "while"); // consume the while keyword
+                expression(); // parse the expression
+                consume(TokensType::Key_do, "do"); // consume the do keyword
+                statement();
+                buildTree("while", 2);
+                break;
+            }
+        // Parsing statement -> 'repeat' Statement list ';' 'until' Expression
+        case TokensType::Key_repeat:
+            {
+                consume(TokensType::Key_repeat, "repeat"); // consume the repeat keyword
+                int n = 1;
+                statement(); // parse the statement
+                while(check(TokensType::Semicolon)) {
+                    advance(); // consume the semicolon
+                    statement(); // parse the statement
+                    n++; // increment the number of statements
+                }
+                consume(TokensType::Key_until, "until"); // consume the until keyword
+                expression();
+                buildTree("repeat", n);
+                break;
+            }
+        // Parsing statement -> 'read' '(' Identifier list ',' ')'
+        case TokensType::Key_read:
+            {
+                consume(TokensType::Key_read, "read"); // consume the read keyword
+                consume(TokensType::OpenParen, "open parenthesis");
+                int n = 1;
+                identifier(); // parse the identifier
+                while(check(TokensType::Comma)) {
+                    advance(); // consume the comma
+                    identifier(); // parse the identifier
+                    n++; // increment the number of identifiers
+                }
+                consume(TokensType::CloseParen, "close parenthesis");
+                buildTree("read", n);
+                break;
+            }
+        // Parsing statement -> 'exit'
+        case TokensType::Key_exit:
+            {
+                consume(TokensType::Key_exit, "exit"); // consume the exit keyword
+                buildTree("exit", 0);
+                break;
+            }
+        // Parsing statement -> 'return' Expression
+        case TokensType::Key_return:
+            {
+                consume(TokensType::Key_return, "return"); // consume the return keyword
+                expression(); // parse the expression
+                buildTree("return", 1);
+                break;
+            }
+        default:
+            {
+            LOG_ERROR("Expected output expression, if expression, while expression, repeat expression, for expression, loop expression, case expression, read expression, exit expression, return expression, or begin expression but found " + peek().toString());
+            return;
+            }
+    }
+}
+
+/**
+* @brief Parses the assignment.
+* @details following the grammar is parsed,
+* Assignment -> Identifier ':=' Expression
+* Assignment -> Identifier ':=:' Identifier
+* @return void
+*/
+void Parser::assignment() {
+    LOG_INFO("Parsing assignment");
+    // Parsing Identifier since both assignment and swap start with an identifier
+    identifier();
+
+    switch (peek().type) {
+        // Parsing Assignment -> Identifier ':=' Expression
+        case TokensType::Assignment:
+            {
+                advance(); // consume the assignment keyword
+                expression(); // parse the expression
+                buildTree("assign", 2);
+                break;
+            }
+        // Parsing Assignment -> Identifier ':=:' Identifier
+        case TokensType::Swap:
+            {
+                advance(); // consume the swap keyword
+                identifier(); // parse the identifier
+                buildTree("swap", 2);
+                break;
+            }
+        default:
+            {
+                LOG_ERROR("Expected identifier but found " + peek().toString());
+                return;
+            }
+    }
+    return; // TODO: Need to handle errors here
+}
+
+/**
+* @brief Parses the expression.
+* @details following the grammar is parsed,
+* Expression -> Term 
+* Expression -> Term '<' Term
+* Expression -> Term '>' Term
+* Expression -> Term '<=' Term
+* Expression -> Term '>=' Term
+* Expression -> Term '=' Term
+* Expression -> Term '<>' Term
+* @return void
+*/
+void Parser::expression() {
+    LOG_INFO("Parsing expression");
+    // Parsing Expression -> Term
+    // Parse term since all expressions start with a term
+    term();
+    while (
+        check(TokensType::LessThanEqual) ||
+        check(TokensType::LessThan) ||
+        check(TokensType::GreaterThanEqual) ||
+        check(TokensType::GreaterThan) ||
+        check(TokensType::Equal) ||
+        check(TokensType::NotEqual)
+    ) {
+        Token token = advance(); // get relational operator
+        term(); // parse the term
+        switch (token.type) {
+            // Parsing Expression -> Term '<=' Term
+            case TokensType::LessThanEqual:
+                buildTree("<=", 2); 
+                break;
+            // Parsing Expression -> Term '<' Term
+            case TokensType::LessThan:
+                buildTree("<", 2);
+                break;
+            // Parsing Expression -> Term '>=' Term
+            case TokensType::GreaterThanEqual:
+                buildTree(">=", 2);
+                break;
+            // Parsing Expression -> Term '>' Term
+            case TokensType::GreaterThan:
+                buildTree(">", 2);
+                break;
+            // Parsing Expression -> Term '=' Term
+            case TokensType::Equal:
+                buildTree("=", 2);
+                break;
+            // Parsing Expression -> Term '<>' Term
+            case TokensType::NotEqual:
+                buildTree("<>", 2); 
+                break;
+            default:
+                LOG_ERROR("Expected relational operator but found " + token.toString());
+                return; // TODO: Need to handle errors here
+        }
+    }
+    return; // TODO: Need to handle errors here
+}
+
+/**
+* @brief Parses the term.
+* @details following the grammar is parsed,
+* Term -> Factor
+* Term -> Term '+' Factor
+* Term -> Term '-' Factor
+* Term -> Term 'or' Factor
+* @return void
+*/
+void Parser::term() {
+    LOG_INFO("Parsing term");
+    // Parsing Term -> Factor
+    factor();
+    while(
+        check(TokensType::Plus) ||
+        check(TokensType::Minus) ||
+        check(TokensType::Or)
+    )
+    {
+        Token token = advance(); // get arithmetic operator
+        factor(); // parse the factor
+        // Parsing Term -> Term '+' Factor
+        if (token.type == TokensType::Plus) {
+            buildTree("+", 2);
+        } 
+        // Parsing Term -> Term '-' Factor
+        else if (token.type == TokensType::Minus) {
+            buildTree("-", 2);
+        } 
+        // Parsing Term -> Term 'or' Factor
+        else if (token.type == TokensType::Or) {
+            buildTree("or", 2);
+        } 
+        else {
+            LOG_ERROR("Expected plus, minus, or or but found " + token.toString());
+            return; // TODO: Need to handle errors here
+        }
+    }
+    return; // TODO: Need to handle errors here
+}
+
+/**
+* @brief Parses the factor.
+* @details following the grammar is parsed,
+* Factor -> Factor '*' Primary
+* Factor -> Factor '/' Primary
+* Factor -> Factor 'and' Primary
+* Factor -> Factor 'mod' Primary
+* Factor -> Primary
+* @return void
+*/
+void Parser::factor() {
+    LOG_INFO("Parsing factor");
+    // Parsing Factor -> Primary
+    primary(); // parse the primary
+
+    while (
+        check(TokensType::Multiply) || 
+        check(TokensType::Divide) || 
+        check(TokensType::And) || 
+        check(TokensType::Modulus)
+    ) {
+        std::string op; // get the operator
+        // Parsing Factor -> Factor '*' Primary
+        if (check(TokensType::Multiply))      op = "*";
+        // Parsing Factor -> Factor '/' Primary
+        else if (check(TokensType::Divide))   op = "/";
+        // Parsing Factor -> Factor 'and' Primary
+        else if (check(TokensType::And))      op = "and";
+        // Parsing Factor -> Factor 'mod' Primary
+        else if (check(TokensType::Modulus)) op = "mod";
+        else {
+            LOG_ERROR("Expected multiply, divide, and, or, or modulus but found " + peek().toString());
+            return; // TODO: Need to handle errors here
+        }
+        advance(); // consume the operator keyword
+        primary(); // parse the primary
+        buildTree(op, 2);
+    }
+    return; // TODO: Need to handle errors here
+}
+
+/**
+* @brief Parses the primary.
+* @details following the grammar is parsed,
+* Primary -> '-' Primary
+* Primary -> '+' Primary
+* Primary -> 'not' Primary
+* Primary -> 'eof'
+* Primary -> Identifier
+* Primary -> IntegerLiteral
+* Primary -> CharLiteral
+* Primary -> Identifier '(' Expression list ',' ')'
+* Primary ->  '(' Expression ')'
+* Primary -> 'succ' '(' Expression ')'
+* Primary -> 'pred' '(' Expression ')'
+* Primary -> 'chr' '(' Expression ')'
+* Primary -> 'ord' '(' Expression ')'
+* @return void
+*/
+void Parser::primary() {
+    switch (peek().type) {
+        // Parsing Primary -> '-' Primary
+        case TokensType::Minus: {
+            advance(); // consume the minus keyword
+            primary(); // parse the primary
+            buildTree("-", 1);
+            break;
+        }
+        // Parsing Primary -> '+' Primary
+        case TokensType::Plus: {
+            advance(); // consume the plus keyword
+            primary(); // parse the primary
+            buildTree("+", 1);
+            break;
+        }
+        // Parsing Primary -> 'not' Primary
+        case TokensType::Not: {
+            advance(); // consume the not keyword
+            primary();
+            buildTree("not", 1);
+            break;
+        }
+        // Parsing Primary -> 'eof'
+        case TokensType::EndOfFile:
+        {   
+            advance(); // consume the eof keyword
+            push(new TreeNode("eof"));
+            break;
+        }
+        // Parsing Primary -> Identifier
+        // Parsing Primary -> Identifier '(' Expression list ',' ')'
+        case TokensType::Identifier:
+        {
+            identifier(); // parse the identifier
+            // Check if the identifier is followed by a open parenthesis
+            if (check(TokensType::OpenParen)) {
+                // Parsing Primary -> Identifier '(' Expression list ',' ')'
+                advance(); // consume the open parenthesis keyword
+                int n = 1;
+                expression(); // parse the expression
+                // Check if the expression is followed by a comma
+                while(check(TokensType::Comma)) {
+                    advance(); // consume the comma keyword
+                    expression(); // parse the expression
+                    n++; // increment the number of expressions
+                }
+                consume(TokensType::CloseParen, "close parenthesis");
+                buildTree("call", n+1); // n+1 because the function name is also included
+            }
+            break;
+        }
+        // Parsing Primary -> IntegerLiteral
+        case TokensType::IntegerLiteral:
+        {
+            integerLiteral(); // parse the integer literal
+            break;
+        }
+        // Parsing Primary -> CharLiteral
+        case TokensType::CharLiteral:
+        {
+            charLiteral(); // parse the char literal
+            break;
+        }
+        // Parsing Primary -> '(' Expression ')'
+        case TokensType::OpenParen:
+        {
+            advance(); // consume the open parenthesis keyword
+            expression(); // parse the expression
+            consume(TokensType::CloseParen, "close parenthesis");
+            break;
+        }
+        // Parsing Primary -> 'succ' '(' Expression ')'
+        case TokensType::Key_succ:
+        {
+            advance(); // consume the succ keyword
+            consume(TokensType::OpenParen, "open parenthesis");
+            expression(); // parse the expression
+            consume(TokensType::CloseParen, "close parenthesis");
+            buildTree("succ", 1);
+            break;
+        }
+        // Parsing Primary -> 'pred' '(' Expression ')'
+        case TokensType::Key_pred:
+        {
+            advance(); // consume the pred keyword
+            consume(TokensType::OpenParen, "open parenthesis");
+            expression(); // parse the expression
+            consume(TokensType::CloseParen, "close parenthesis"); // consume the close parenthesis keyword
+            buildTree("pred", 1);
+            break;
+        }
+        // Parsing Primary -> 'chr' '(' Expression ')'
+        case TokensType::Key_chr:
+        {
+            advance(); // consume the chr keyword
+            consume(TokensType::OpenParen, "open parenthesis");
+            expression(); // parse the expression
+            consume(TokensType::CloseParen, "close parenthesis");
+            buildTree("chr", 1);
+            break;
+        }
+        // Parsing Primary -> 'ord' '(' Expression ')'
+        case TokensType::Key_ord:
+        {
+            advance(); // consume the ord keyword
+            consume(TokensType::OpenParen, "open parenthesis");
+            expression(); // parse the expression
+            consume(TokensType::CloseParen, "close parenthesis");
+            buildTree("ord", 1);
+            break;
+        }
+        default:
+            LOG_ERROR("expected primary expression, got " + peek().toString());
+            return;
+    }
+}
+
+/**
+* @brief Parses the output expression.
+* @details following the grammar is parsed,
+* OutExp -> StringLiteral
+* OutExp -> Expression
+* @return void
+*/
+void Parser::outexp() {
+    if (check(TokensType::String)) {
+        // Parsing OutExp -> StringLiteral
+        stringLiteral();
+    } else {
+        // Parsing OutExp -> Expression
+        expression();  // parse the expression
+        buildTree("integer", 1);  // build the tree for the output expression
+    }
+}
+
 
 // Parse the string literal.
 void Parser::stringLiteral() {
     LOG_INFO("Parsing string literal");
     Token token = consume(TokensType::String, "string literal");
-    TreeNode* node = new TreeNode("string");
+    TreeNode* node = new TreeNode("<string>");
     TreeNode* child = new TreeNode(token.lexeme);
     node->left = child;
     push(node);
@@ -399,33 +901,7 @@ void Parser::outputExpression() {
     return; // TODO: Update the implementation
 }
 
-// Parse the statement.
-void Parser::statement() {
-    LOG_INFO("Parsing statement");
-    switch (peek().type) {
-        case TokensType::Key_output:
-            outputExpression();
-            buildTree("output", 1);
-            break;
-        default:
-            LOG_ERROR("Expected output expression but found " + peek().toString());
-            return;
-    }
-    return; // TODO: Update the implementation
-}
 
-// Parse the body.
-void Parser::body() {
-    LOG_INFO("Parsing body");
-    consume(TokensType::Key_begin, "begin");
-    statement();
-    if (check(TokensType::Semicolon)) {
-        advance();
-    }
-    consume(TokensType::Key_end, "end");
-    buildTree("block", 1);
-    return; // TODO: Update the implementation
-}
 
 void Parser::program() {
     LOG_INFO("Parsing program");

@@ -53,9 +53,16 @@ private:
     void params(); // Parse the params statement.
     void dcln(); // Parse the dcln statement.
     void dclns(); // Parse the dclns statement.
-
     void body(); // Parse the body statement.
     void statement(); // Parse the statement.
+    void assignment(); // Parse the assignment.
+    void outexp(); // Parse the output expression.
+
+    void expression(); // Parse the expression.
+    void term(); // Parse the term.
+    void factor(); // Parse the factor.
+    void primary(); // Parse the primary.
+
     void identifier(); // Parse the identifier.
     void outputExpression(); // Parse the output expression.
     void stringLiteral(); // Parse the string literal.
