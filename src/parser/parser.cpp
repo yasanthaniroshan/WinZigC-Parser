@@ -428,6 +428,7 @@ void Parser::body() {
 * statement -> 'if' Expression 'then' Statement ('else' Statement)?
 * statement -> 'while' Expression 'do' Statement
 * statement -> 'repeat' Statement list ';' 'until' Expression
+* statement -> 'for' '(' ForStatement ';' ForExpression ';' ForStatement ')' Statement
 * statement -> 'read' '(' Identifier list ',' ')'
 * statement -> 'exit'
 * statement -> 'return' Expression
@@ -497,7 +498,22 @@ void Parser::statement() {
                 }
                 consume(TokensType::Key_until, "until"); // consume the until keyword
                 expression();
-                buildTree("repeat", n);
+                buildTree("repeat", n + 1);
+                break;
+            }
+        // Parsing statement -> 'for' '(' ForStatement ';' ForExpression ';' ForStatement ')' Statement
+        case TokensType::Key_for:
+            {
+                consume(TokensType::Key_for, "for"); // consume the for keyword
+                consume(TokensType::OpenParen, "open parenthesis");
+                forstatement();
+                consume(TokensType::Semicolon, "semicolon");
+                forexpression();
+                consume(TokensType::Semicolon, "semicolon");
+                forstatement();
+                consume(TokensType::CloseParen, "close parenthesis");
+                statement();
+                buildTree("for", 4);
                 break;
             }
         // Parsing statement -> 'read' '(' Identifier list ',' ')'
@@ -537,6 +553,44 @@ void Parser::statement() {
             return;
             }
     }
+}
+
+/**
+* @brief Parses the for statement.
+* @details following the grammar is parsed,
+* ForStatement -> Assignment
+* ForStatment -> 
+* @return void
+*/
+void Parser::forstatement() {
+    LOG_INFO("Parsing for statement");
+    // Check if the for statement is empty
+    if(!check(TokensType::Identifier)) {
+        // Parsing ForStatement -> <null>
+        push(new TreeNode("<null>"));
+        return; // TODO: Need to handle errors here
+    }
+    // Parsing ForStatement -> Assignment
+    assignment();
+    return; // TODO: Need to handle errors here
+}
+
+/**
+* @brief Parses the for expression.
+* @details following the grammar is parsed,
+* ForExpression -> Expression
+* ForExpression ->
+* @return void
+*/
+void Parser::forexpression() {
+    // check if the for expression is empty
+    if (check(TokensType::Semicolon)) {
+        // Parsing ForExpression -> <null>
+        push(new TreeNode("true"));
+        return;
+    }
+    // Parsing ForExpression -> Expression
+    expression();
 }
 
 /**

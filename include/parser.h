@@ -56,6 +56,8 @@ private:
     void dclns(); // Parse the dclns statement.
     void body(); // Parse the body statement.
     void statement(); // Parse the statement.
+    void forstatement(); // Parse the for statement.
+    void forexpression(); // Parse the for expression.
     void assignment(); // Parse the assignment.
     void outexp(); // Parse the output expression.
 
