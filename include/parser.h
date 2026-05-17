@@ -18,6 +18,7 @@ public:
     Parser(const std::vector<Token>& tokens);
     ~Parser();
     Result<void> parse();
+    Result<TreeNode*> parseTree();
 
 private:
     std::vector<Token> tokens; // The tokens to parse.

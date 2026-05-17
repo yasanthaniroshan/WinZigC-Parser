@@ -1,0 +1,4 @@
+program t:
+begin
+  output("a","b");
+end t.

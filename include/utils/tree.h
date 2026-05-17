@@ -22,5 +22,6 @@ struct TreeNode {
 
 int countChildren(TreeNode* node);
 void printTree(TreeNode* node, int depth);
+std::string treeToString(TreeNode* node, int depth = 0);
 
 #endif

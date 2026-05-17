@@ -71,7 +71,10 @@ target_link_libraries(parser
 # Add test scripts for testing
 add_executable(tests 
     tests/unit/test_argparser.cpp
+    tests/unit/test_parser.cpp
 )
+
+target_compile_definitions(tests PRIVATE TEST_GRAMMAR_DIR="${CMAKE_SOURCE_DIR}/tests/grammar")
 
 target_link_libraries(tests
     PRIVATE

@@ -1,0 +1,4 @@
+program t:
+const Digit = '0';
+begin
+end t.

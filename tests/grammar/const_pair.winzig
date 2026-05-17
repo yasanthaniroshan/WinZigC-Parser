@@ -1,0 +1,4 @@
+program t:
+const Count = 7, Flag = 'Y';
+begin
+end t.

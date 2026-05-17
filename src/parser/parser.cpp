@@ -22,14 +22,25 @@ Parser::~Parser() {
 
 // ==================== Helper Functions ====================
 
-// Parse the WinZigC program.
-Result<void> Parser::parse() {
+Result<TreeNode*> Parser::parseTree() {
     winzig();
     if (!isAtEnd() && peek().type != TokensType::EndOfFile) {
         LOG_ERROR("Expected end of file");
-        return Result<void>::Err(ParserError("Expected end of file"));
+        return Result<TreeNode*>::Err(ParserError("Expected end of file"));
     }
-    printTree(stack.back(), 0);
+    if (stack.empty()) {
+        return Result<TreeNode*>::Err(ParserError("empty parse stack"));
+    }
+    return Result<TreeNode*>::Ok(stack.back());
+}
+
+// Parse the WinZigC program.
+Result<void> Parser::parse() {
+    auto result = parseTree();
+    if (!result.success) {
+        return Result<void>::Err(ParserError(result.error_message.value_or("parse failed")));
+    }
+    printTree(result.value.value(), 0);
     return Result<void>::Ok();
 }
 
@@ -853,8 +864,9 @@ void Parser::primary() {
 */
 void Parser::outexp() {
     if (check(TokensType::String)) {
-        // Parsing OutExp -> StringLiteral
+        // OutExp -> StringNode => "string"
         stringLiteral();
+        buildTree("string", 1);
     } else {
         // Parsing OutExp -> Expression
         expression();  // parse the expression

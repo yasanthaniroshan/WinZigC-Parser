@@ -1,0 +1,4 @@
+program t:
+const Zero = 0;
+begin
+end t.

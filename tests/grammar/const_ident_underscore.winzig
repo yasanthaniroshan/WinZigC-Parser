@@ -1,0 +1,4 @@
+program t:
+const max_count = 100;
+begin
+end t.

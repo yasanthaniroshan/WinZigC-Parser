@@ -1,0 +1,4 @@
+program t:
+const Max = 42;
+begin
+end t.
