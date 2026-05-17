@@ -48,8 +48,12 @@ private:
     void typeDeclaration(); // Parse the type declaration.
     void litlist(); // Parse the litlist.
      
-    void dclns(); // Parse the dclns statement.
     void subprogs(); // Parse the subprogs statement.
+    void fcn(); // Parse the fcn statement.
+    void params(); // Parse the params statement.
+    void dclns(); // Parse the dclns statement.
+    void dcln(); // Parse the dcln statement.
+
     void body(); // Parse the body statement.
     void statement(); // Parse the statement.
     void identifier(); // Parse the identifier.

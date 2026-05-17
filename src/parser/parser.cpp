@@ -237,19 +237,126 @@ void Parser::litlist() {
     buildTree("lit", n);
     return; // TODO: Need to handle errors here
 }
-
-// Parse the subprogs.
+/** 
+* @brief Parses the subprograms.
+* @details following the grammar is parsed,
+* subprogs -> Fcn
+* subprogs ->
+* @return void
+*/
 void Parser::subprogs() {
     LOG_INFO("Parsing subprograms");
-    push(new TreeNode("subprogs"));
-    return; // TODO: Implement
+    // Check if there are any subprograms in the program
+    if(!check(TokensType::Key_function)) {
+        // If there are no subprograms in the program, push a subprogs node to the stack
+        // Parsing subprogs -> 
+        push(new TreeNode("subprogs"));
+        return; // TODO: Need to handle errors here
+    }
+    // If there are subprograms in the program, parse the subprograms
+    // subprogs -> Fcn
+    int n = 0;
+    do {
+        fcn(); // parse the function declaration
+        n++; // increment the number of function declarations
+    } while (check(TokensType::Identifier));
+    buildTree("subprogs", n); // Build the tree for the subprograms statement
+    return; // TODO: Need to handle errors here
 }
 
-// Parse the dclns.
+/**
+* @brief Parses the fcn statement.
+* @details following the grammar is parsed,
+* fcn -> 'function' <identifier> '(' Params ')' ':' <identifier> ';' Consts Types Dclns Body Name ';'
+* @return void
+*/
+void Parser::fcn() {
+    LOG_INFO("Parsing fcn");
+    // Parsing fcn -> 'function' <identifier> '(' Params ')' ':' <identifier> ';' Consts Types Dclns Body Name ';'
+    consume(TokensType::Key_function, "function");
+    identifier();
+    consume(TokensType::OpenParen, "open parenthesis");
+    params();
+    consume(TokensType::CloseParen, "close parenthesis");
+    consume(TokensType::Colon, "colon");
+    identifier();
+    consume(TokensType::Semicolon, "semicolon");
+    consts();
+    types();
+    dclns();
+    body();
+    identifier();
+    consume(TokensType::Semicolon, "semicolon");
+    buildTree("fcn", 9);
+    return; // TODO: Need to handle errors here
+}
+
+/**
+* @brief Parses the params.
+* @details following the grammar is parsed,
+* Params -> Dcln list ';'
+* @return void
+*/
+void Parser::params() {
+    LOG_INFO("Parsing params");
+    // Parsing params -> Dcln list ';'
+    dcln();
+    int n = 1;
+    while (check(TokensType::Semicolon)) {
+        advance(); // consume the semicolon
+        dcln(); // parse the dcln
+        n++; // increment the number of dcln
+    }
+    buildTree("params", n); // Build the tree for the params statement
+    return; // TODO: Need to handle errors here
+}
+
+/**
+* @brief Parses the dcln.
+* @details following the grammar is parsed,
+* dcln -> <identifier> list ',' ':' <identifier> 
+* @return void
+*/
+void Parser::dcln() {
+    LOG_INFO("Parsing dcln");
+    identifier();
+    int n = 1;
+    while (check(TokensType::Comma)) {
+        advance(); // consume the comma
+        identifier(); // parse the identifier
+        n++; // increment the number of identifiers
+    }
+    consume(TokensType::Colon, "colon");
+    identifier();
+    buildTree("var", n);
+    return; // TODO: Need to handle errors here
+}
+
+/**
+* @brief Parses the dclns.
+* @details following the grammar is parsed,
+* dclns -> 'var' (Dcln ';' )+
+* dclns ->
+* @return void
+*/
 void Parser::dclns() {
     LOG_INFO("Parsing declarations");
-    push(new TreeNode("dclns"));
-    return; // TODO: Implement
+    // Check if there are any declarations in the program
+    if(!check(TokensType::Key_var)) {
+        // If there are no declarations in the program, push a dclns node to the stack
+        // Parsing dclns -> 
+        push(new TreeNode("dclns"));
+        return; // TODO: Need to handle errors here
+    }
+    // If there are declarations in the program, parse the declarations
+    consume(TokensType::Key_var, "var");
+    int n = 0;
+    do {
+        dcln(); // parse the dcln
+        n++; // increment the number of dclns
+    } while (!check(TokensType::Identifier));
+    buildTree("dclns", n); // Build the tree for the dclns statement
+    return; // TODO: Need to handle errors here
 }
 
 
