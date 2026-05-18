@@ -1,5 +1,12 @@
 # WinzigC Parser
 
+[![C++ CI](https://github.com/yasanthaniroshan/WinZigC-Parser/actions/workflows/ci.yaml/badge.svg)](https://github.com/yasanthaniroshan/WinZigC-Parser/actions/workflows/ci.yaml)
+[![Release](https://github.com/yasanthaniroshan/WinZigC-Parser/actions/workflows/release.yaml/badge.svg)](https://github.com/yasanthaniroshan/WinZigC-Parser/actions/workflows/release.yaml)
+![GitHub release](https://img.shields.io/github/v/release/yasanthaniroshan/WinZigC-Parser)
+![Linux](https://img.shields.io/badge/Linux-supported-success)
+![macOS](https://img.shields.io/badge/macOS-supported-success)
+![Windows](https://img.shields.io/badge/Windows-supported-success)
+
 A recursive-descent parser for the WinZigC language. It tokenizes source files, builds an abstract syntax tree, and can print that tree for debugging.
 
 ## Project layout
@@ -188,13 +195,17 @@ lcov --capture \
      --ignore-errors mismatch,source,gcov
 
 lcov --remove coverage.info '*/tests/*' -o coverage.info
+
+genhtml coverage.info --output-directory coverage-html
 ```
+
+Open `coverage-html/index.html` in a browser to view line coverage.
 
 To drop coverage instrumentation, do a **full clean** and reconfigure without `-DENABLE_COVERAGE=ON`.
 
 ## CI and releases
 
-- **CI** (`.github/workflows/ci.yaml`): runs on every push and pull request — configure, build with coverage, run tests, capture lcov.
+- **CI** (`.github/workflows/ci.yaml`): runs on every push and pull request — configure, build with coverage, run tests, capture lcov, post a coverage summary (job summary and PR comment), and upload an HTML report artifact (`coverage-report`).
 - **Release** (`.github/workflows/release.yaml`): triggered by pushing a version tag (`v*`, e.g. `v0.1.1`) or manually from the Actions tab. Builds `winzigc` for Linux, macOS, and Windows and attaches binaries to a GitHub Release.
 
 ```bash

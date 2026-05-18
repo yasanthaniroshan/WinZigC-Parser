@@ -62,8 +62,8 @@ namespace {
 // For printing out the tokens 
 std::string tokenTypeToString(TokensType type) {
     switch (type) {
-        // case TokensType::EndOfFile: return "EndOfFile";
-        // case TokensType::Unknown: return "Unknown"; // handled as the default at the end
+        case TokensType::EndOfFile: return "EndOfFile";
+        case TokensType::Unknown: return "Unknown";
         case TokensType::Newline: return "Newline";
         case TokensType::CommentTypeOne: return "CommentTypeOneSingleLine";
         case TokensType::CommentTypeTwo: return "CommentTypeTwoMultiLine";
