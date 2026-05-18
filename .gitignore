@@ -1,2 +1,4 @@
 build/*
 logs/*
+third_party/*
+winzigc
