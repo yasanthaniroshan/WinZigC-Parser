@@ -547,13 +547,15 @@ void Parser::statement() {
         // Parsing statement -> 'case' Expression 'of' CaseClauses 'otherwise' CaseExpression 'end'
         case TokensType::Key_case:
             {
+                bool hasOtherwise = false;
                 consume(TokensType::Key_case, "case"); // consume the case keyword
                 expression(); // parse the expression
                 consume(TokensType::Key_of, "of"); // consume the of keyword
                 caseclauses(); // parse the case clauses
+                hasOtherwise = check(TokensType::Key_otherwise);
                 otherwiseclause(); // parse the otherwise clause
                 consume(TokensType::Key_end, "end");
-                buildTree("case", 3);
+                buildTree("case", hasOtherwise ? 3 : 2);
                 break;
             }
         // Parsing statement -> 'read' '(' Identifier list ',' ')'
@@ -611,13 +613,15 @@ void Parser::caseclauses() {
     LOG_DEBUG("Parsing case clauses");
     // Parsing CaseClauses -> (CaseClause ';')+
     caseclause(); // parse the case clause
+    int n = 1;
     while (check(TokensType::Semicolon)) {
         advance(); // consume the semicolon
         if (check(TokensType::Key_end) || check(TokensType::Key_otherwise))
             break; // if the end or otherwise keyword is found, break the loop
         caseclause(); // parse the case clause
+        n++; // increment the number of case clauses
     }
-    buildTree("case_clauses", 1); // Build the tree for the case clauses statement
+    buildTree("case_clauses", n); // Build the tree for the case clauses statement
     return; // TODO: Need to handle errors here
 }
 
