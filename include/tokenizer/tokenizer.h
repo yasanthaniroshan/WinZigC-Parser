@@ -69,6 +69,7 @@ enum class TokensType {
     Key_pred,       // return the predecessor of an ordinal value, similar idea as succ I guess
     Key_chr,        // specification just says "character function"
     Key_ord,        // specification just says "ordinal function"
+    Key_eof,        // end of file
 
     // operators
     Swap,               // :=:

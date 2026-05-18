@@ -940,7 +940,7 @@ void Parser::primary() {
             break;
         }
         // Parsing Primary -> 'eof'
-        case TokensType::EndOfFile:
+        case TokensType::Key_eof:
         {   
             advance(); // consume the eof keyword
             push(new TreeNode("eof"));

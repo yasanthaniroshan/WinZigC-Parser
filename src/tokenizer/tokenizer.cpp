@@ -40,13 +40,14 @@ namespace {
             {"pred", TokensType::Key_pred},
             {"chr", TokensType::Key_chr},
             {"ord", TokensType::Key_ord},
+            {"eof", TokensType::Key_eof},
 
             // also including alphabetic operators and delimiters
             {"mod", TokensType::Modulus},
             {"and", TokensType::And},
             {"or", TokensType::Or}, 
             {"not", TokensType::Not},
-            {"eof", TokensType::EndOfFile}
+            // {"eof", TokensType::EndOfFile}
         };
 
         // NOTE: we used transparent lookup (with std::less<>)
@@ -61,7 +62,7 @@ namespace {
 // For printing out the tokens 
 std::string tokenTypeToString(TokensType type) {
     switch (type) {
-        case TokensType::EndOfFile: return "EndOfFile";
+        // case TokensType::EndOfFile: return "EndOfFile";
         // case TokensType::Unknown: return "Unknown"; // handled as the default at the end
         case TokensType::Newline: return "Newline";
         case TokensType::CommentTypeOne: return "CommentTypeOneSingleLine";
@@ -98,6 +99,7 @@ std::string tokenTypeToString(TokensType type) {
         case TokensType::Key_pred: return "Key_pred";
         case TokensType::Key_chr: return "Key_chr";
         case TokensType::Key_ord: return "Key_ord";
+        case TokensType::Key_eof: return "Key_eof";
         case TokensType::Swap: return "Swap";
         case TokensType::Assignment: return "Assignment";
         case TokensType::LessThanEqual: return "LessThanEqual";
@@ -154,8 +156,8 @@ Result<std::vector<Token>> Tokenizer::tokenize() {
         tokens.push_back(std::move(token));
         // `push_back()` has overload that takes rvalue and moves instead of copying.
 
-        if (tokens.back().type == TokensType::EndOfFile) {
-            break; // we've come to the end of the input file.
+        if (tokens.back().type == TokensType::EndOfFile && tokens.back().lexeme.empty()) {
+            break;
         }
     }
     // We need to use `std::move` here since the `Ok()` function itself uses
