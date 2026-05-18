@@ -98,6 +98,12 @@ add_executable(tests
     tests/unit/test_argparser.cpp
     tests/unit/test_parser.cpp
     tests/unit/test_integration.cpp
+    tests/unit/test_tokenizer.cpp
+    tests/unit/test_filereader.cpp
+    tests/unit/test_tree.cpp
+    tests/unit/test_result.cpp
+    tests/unit/test_logger.cpp
+    tests/unit/test_parser_edges.cpp
 )
 target_compile_definitions(tests PRIVATE
     TEST_GRAMMAR_DIR="${CMAKE_SOURCE_DIR}/tests/grammar"

@@ -1128,6 +1128,10 @@ void Parser::push(TreeNode* node) {
 
 // Pop a node from the stack.
 TreeNode* Parser::pop() {
+    if (stack.empty()) {
+        LOG_ERROR("Stack is empty");
+        return nullptr;
+    }
     TreeNode* node = stack.back();
     stack.pop_back();
     return node;
@@ -1139,6 +1143,10 @@ void Parser::buildTree(std::string x, int n) {
     TreeNode* parent = nullptr;
     for (int i = 0; i < n; i++) {
         TreeNode* child = pop();
+        if (child == nullptr) {
+            LOG_ERROR("Child is null");
+            return;
+        }
         child->right = parent;
         parent = child;
     }
