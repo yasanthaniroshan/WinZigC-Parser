@@ -59,7 +59,7 @@ private:
     void forexpression(); // Parse the for expression.
     void assignment(); // Parse the assignment.
     void outexp(); // Parse the output expression.
-    void caseclauses(); // Parse the case clauses.
+    int caseclauses(); // Parse the case clauses. Need to find how many case clauses are there.
     void otherwiseclause(); // Parse the otherwise clause.
     void caseclause(); // Parse the case clause.
     void caseexpression(); // Parse the case expression.

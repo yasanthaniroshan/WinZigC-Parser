@@ -396,30 +396,15 @@ void Parser::body() {
     }
     // If the body is not empty, parse the body
     // Parsing body -> 'begin' Statement list ';' 'end'
-    int n = 0;
-    while(
-        check(TokensType::Identifier) ||
-        check(TokensType::Key_output) ||
-        check(TokensType::Key_if) ||
-        check(TokensType::Key_while) ||
-        check(TokensType::Key_repeat) ||
-        check(TokensType::Key_for) ||
-        check(TokensType::Key_loop) ||
-        check(TokensType::Key_case) ||
-        check(TokensType::Key_read) ||
-        check(TokensType::Key_exit) ||
-        check(TokensType::Key_return) ||
-        check(TokensType::Key_begin)
-    ) {
-        // Parse the statement
-        statement();
-        if(check(TokensType::Semicolon)) {
-            advance(); // consume the semicolon
-        }
+    statement(); // parse the statement
+    int n = 1; 
+    while (check(TokensType::Semicolon)) {
+        advance(); // consume the semicolon
+        statement();   // may produce <null> when next token is 'end'
         n++; // increment the number of statements
     }
     consume(TokensType::Key_end, "end"); // consume the end keyword
-    buildTree("block", n); // Build the tree for the body statement
+    buildTree("block", n); // Build the tree for the block statement
     return; // TODO: Need to handle errors here
 } 
 /**
@@ -551,11 +536,11 @@ void Parser::statement() {
                 consume(TokensType::Key_case, "case"); // consume the case keyword
                 expression(); // parse the expression
                 consume(TokensType::Key_of, "of"); // consume the of keyword
-                caseclauses(); // parse the case clauses
+                int nClauses = caseclauses(); // parse the case clauses
                 hasOtherwise = check(TokensType::Key_otherwise);
                 otherwiseclause(); // parse the otherwise clause
                 consume(TokensType::Key_end, "end");
-                buildTree("case", hasOtherwise ? 3 : 2);
+                buildTree("case", 1 + nClauses + (hasOtherwise ? 1 : 0));
                 break;
             }
         // Parsing statement -> 'read' '(' Identifier list ',' ')'
@@ -607,9 +592,9 @@ void Parser::statement() {
 * @brief Parses the case clauses.
 * @details following the grammar is parsed,
 * CaseClauses -> (CaseClause ';')+
-* @return void
+* @return int: number of case clauses
 */
-void Parser::caseclauses() {
+int Parser::caseclauses() {
     LOG_DEBUG("Parsing case clauses");
     // Parsing CaseClauses -> (CaseClause ';')+
     caseclause(); // parse the case clause
@@ -621,8 +606,7 @@ void Parser::caseclauses() {
         caseclause(); // parse the case clause
         n++; // increment the number of case clauses
     }
-    buildTree("case_clauses", n); // Build the tree for the case clauses statement
-    return; // TODO: Need to handle errors here
+    return n; // TODO: Need to handle errors here
 }
 
 /**
@@ -663,9 +647,7 @@ void Parser::caseexpression() {
         advance(); // consume the double dot
         constValue();
         buildTree("..", 2);
-    } else {
-        buildTree("const", 1);
-    }
+    } 
     return; // TODO: Need to handle errors here
 }
 
@@ -1102,7 +1084,11 @@ void Parser::charLiteral() {
     // Parsing CharLiteral -> '<char>'
     Token token = consume(TokensType::CharLiteral, "char literal");
     TreeNode* node = new TreeNode("<char>");
-    TreeNode* child = new TreeNode(token.lexeme);
+    std::string label = token.lexeme;
+    if (label.length() == 1) {
+        label = "'" + label + "'";
+    }
+    TreeNode* child = new TreeNode(label);
     node->left = child;
     push(node);
     return; // TODO: Need to handle errors here
