@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cstdlib>
 #include <string>
 
 #include "parser/parser.h"
@@ -65,6 +66,7 @@ TEST_P(ParserGrammarFileTest, MatchesGoldenTree) {
     delete root;
 }
 
+// StringNode -> '<string>' (via output; golden uses string(1) child)
 INSTANTIATE_TEST_SUITE_P(
     StringNode, ParserGrammarFileTest,
     ::testing::Values(
@@ -73,6 +75,66 @@ INSTANTIATE_TEST_SUITE_P(
         GrammarFileCase{"spaces", "string_spaces"},
         GrammarFileCase{"two_in_output", "string_two"},
         GrammarFileCase{"special_chars", "string_special"}),
+    [](const ::testing::TestParamInfo<GrammarFileCase>& info) {
+        return info.param.name;
+    });
+
+// OutExp -> Expression => "integer" | StringNode => "string"
+INSTANTIATE_TEST_SUITE_P(
+    OutExp, ParserGrammarFileTest,
+    ::testing::Values(
+        GrammarFileCase{"outexp_integer", "outexp_integer"},
+        GrammarFileCase{"outexp_string", "outexp_string"},
+        GrammarFileCase{"outexp_two_int", "outexp_two_int"},
+        GrammarFileCase{"outexp_two_mixed", "outexp_two_mixed"},
+        GrammarFileCase{"outexp_three", "outexp_three"}),
+    [](const ::testing::TestParamInfo<GrammarFileCase>& info) {
+        return info.param.name;
+    });
+
+// Caseclauses -> (Caseclause ';')+
+INSTANTIATE_TEST_SUITE_P(
+    CaseClauses, ParserGrammarFileTest,
+    ::testing::Values(
+        GrammarFileCase{"caseclauses_one", "caseclauses_one"},
+        GrammarFileCase{"caseclauses_two", "caseclauses_two"},
+        GrammarFileCase{"caseclauses_three", "caseclauses_three"},
+        GrammarFileCase{"caseclauses_mixed", "caseclauses_mixed"}),
+    [](const ::testing::TestParamInfo<GrammarFileCase>& info) {
+        return info.param.name;
+    });
+
+// Caseclause -> CaseExpression list ',' ':' Statement => "case_clause"
+INSTANTIATE_TEST_SUITE_P(
+    CaseClause, ParserGrammarFileTest,
+    ::testing::Values(
+        GrammarFileCase{"caseclause_integer", "caseclause_integer"},
+        GrammarFileCase{"caseclause_char", "caseclause_char"},
+        GrammarFileCase{"caseclause_name", "caseclause_name"},
+        GrammarFileCase{"caseclause_labels_two", "caseclause_labels_two"},
+        GrammarFileCase{"caseclause_labels_three", "caseclause_labels_three"}),
+    [](const ::testing::TestParamInfo<GrammarFileCase>& info) {
+        return info.param.name;
+    });
+
+// CaseExpression -> ConstValue | ConstValue '..' ConstValue => ".."
+INSTANTIATE_TEST_SUITE_P(
+    CaseExpression, ParserGrammarFileTest,
+    ::testing::Values(
+        GrammarFileCase{"caseclause_integer", "caseclause_integer"},
+        GrammarFileCase{"caseclause_char", "caseclause_char"},
+        GrammarFileCase{"caseclause_name", "caseclause_name"},
+        GrammarFileCase{"caseexpr_range", "caseexpr_range"}),
+    [](const ::testing::TestParamInfo<GrammarFileCase>& info) {
+        return info.param.name;
+    });
+
+// OtherwiseClause -> 'otherwise' Statement | epsilon
+INSTANTIATE_TEST_SUITE_P(
+    OtherwiseClause, ParserGrammarFileTest,
+    ::testing::Values(
+        GrammarFileCase{"otherwise_absent", "otherwise_absent"},
+        GrammarFileCase{"otherwise_present", "otherwise_present"}),
     [](const ::testing::TestParamInfo<GrammarFileCase>& info) {
         return info.param.name;
     });
@@ -180,6 +242,151 @@ INSTANTIATE_TEST_SUITE_P(
         return info.param.name;
     });
 
+// Expression -> Term | Term relop Term  (relop: < > <= >= = <>)
+INSTANTIATE_TEST_SUITE_P(
+    Expression, ParserGrammarFileTest,
+    ::testing::Values(
+        GrammarFileCase{"expr_term", "expr_term"},
+        GrammarFileCase{"expr_rel_lt", "expr_rel_lt"},
+        GrammarFileCase{"expr_rel_gt", "expr_rel_gt"},
+        GrammarFileCase{"expr_rel_le", "expr_rel_le"},
+        GrammarFileCase{"expr_rel_ge", "expr_rel_ge"},
+        GrammarFileCase{"expr_rel_eq", "expr_rel_eq"},
+        GrammarFileCase{"expr_rel_ne", "expr_rel_ne"},
+        GrammarFileCase{"expr_rel_chain", "expr_rel_chain"},
+        GrammarFileCase{"expr_precedence", "expr_precedence"},
+        GrammarFileCase{"expr_paren_nested", "expr_paren_nested"},
+        GrammarFileCase{"expr_mixed", "expr_mixed"}),
+    [](const ::testing::TestParamInfo<GrammarFileCase>& info) {
+        return info.param.name;
+    });
+
+// Term -> Factor | Term '+' Factor | Term '-' Factor | Term 'or' Factor
+INSTANTIATE_TEST_SUITE_P(
+    Term, ParserGrammarFileTest,
+    ::testing::Values(
+        GrammarFileCase{"term_factor", "term_factor"},
+        GrammarFileCase{"term_add", "term_add"},
+        GrammarFileCase{"term_sub", "term_sub"},
+        GrammarFileCase{"term_or", "term_or"},
+        GrammarFileCase{"term_add_chain", "term_add_chain"}),
+    [](const ::testing::TestParamInfo<GrammarFileCase>& info) {
+        return info.param.name;
+    });
+
+// Factor -> Primary | Factor '*' Primary | Factor '/' Primary
+//         | Factor 'and' Primary | Factor 'mod' Primary
+INSTANTIATE_TEST_SUITE_P(
+    Factor, ParserGrammarFileTest,
+    ::testing::Values(
+        GrammarFileCase{"factor_primary", "factor_primary"},
+        GrammarFileCase{"factor_mul", "factor_mul"},
+        GrammarFileCase{"factor_div", "factor_div"},
+        GrammarFileCase{"factor_and", "factor_and"},
+        GrammarFileCase{"factor_mod", "factor_mod"},
+        GrammarFileCase{"factor_mul_chain", "factor_mul_chain"}),
+    [](const ::testing::TestParamInfo<GrammarFileCase>& info) {
+        return info.param.name;
+    });
+
+// Primary -> unary | eof | Identifier | literals | call | '(' Expression ')'
+//          | succ | pred | chr | ord
+INSTANTIATE_TEST_SUITE_P(
+    Primary, ParserGrammarFileTest,
+    ::testing::Values(
+        GrammarFileCase{"primary_integer", "primary_integer"},
+        GrammarFileCase{"primary_char", "primary_char"},
+        GrammarFileCase{"primary_ident", "primary_ident"},
+        GrammarFileCase{"primary_eof", "primary_eof"},
+        GrammarFileCase{"primary_neg", "primary_neg"},
+        GrammarFileCase{"primary_pos", "primary_pos"},
+        GrammarFileCase{"primary_not", "primary_not"},
+        GrammarFileCase{"primary_paren", "primary_paren"},
+        GrammarFileCase{"primary_call", "primary_call"},
+        GrammarFileCase{"primary_call_two", "primary_call_two"},
+        GrammarFileCase{"primary_succ", "primary_succ"},
+        GrammarFileCase{"primary_pred", "primary_pred"},
+        GrammarFileCase{"primary_chr", "primary_chr"},
+        GrammarFileCase{"primary_ord", "primary_ord"}),
+    [](const ::testing::TestParamInfo<GrammarFileCase>& info) {
+        return info.param.name;
+    });
+
+// Assignment -> Identifier ':=' Expression => "assign"
+//            | Identifier ':=:' Identifier => "swap"
+INSTANTIATE_TEST_SUITE_P(
+    Assignment, ParserGrammarFileTest,
+    ::testing::Values(
+        GrammarFileCase{"assign_integer", "assign_integer"},
+        GrammarFileCase{"assign_swap", "assign_swap"},
+        GrammarFileCase{"assign_name", "assign_name"},
+        GrammarFileCase{"assign_char_lit", "assign_char_lit"},
+        GrammarFileCase{"assign_rel_lt", "assign_rel_lt"},
+        GrammarFileCase{"assign_rel_gt", "assign_rel_gt"},
+        GrammarFileCase{"assign_rel_le", "assign_rel_le"},
+        GrammarFileCase{"assign_rel_ge", "assign_rel_ge"},
+        GrammarFileCase{"assign_rel_eq", "assign_rel_eq"},
+        GrammarFileCase{"assign_rel_ne", "assign_rel_ne"},
+        GrammarFileCase{"assign_add", "assign_add"},
+        GrammarFileCase{"assign_sub", "assign_sub"},
+        GrammarFileCase{"assign_or", "assign_or"},
+        GrammarFileCase{"assign_mul", "assign_mul"},
+        GrammarFileCase{"assign_div", "assign_div"},
+        GrammarFileCase{"assign_and", "assign_and"},
+        GrammarFileCase{"assign_mod", "assign_mod"},
+        GrammarFileCase{"assign_unary_minus", "assign_unary_minus"},
+        GrammarFileCase{"assign_unary_plus", "assign_unary_plus"},
+        GrammarFileCase{"assign_unary_not", "assign_unary_not"},
+        GrammarFileCase{"assign_paren", "assign_paren"},
+        GrammarFileCase{"assign_eof", "assign_eof"},
+        GrammarFileCase{"assign_call", "assign_call"},
+        GrammarFileCase{"assign_succ", "assign_succ"},
+        GrammarFileCase{"assign_pred", "assign_pred"},
+        GrammarFileCase{"assign_chr", "assign_chr"},
+        GrammarFileCase{"assign_ord", "assign_ord"}),
+    [](const ::testing::TestParamInfo<GrammarFileCase>& info) {
+        return info.param.name;
+    });
+
+// ForStatement -> Assignment | epsilon => "<null>"
+INSTANTIATE_TEST_SUITE_P(
+    ForStat, ParserGrammarFileTest,
+    ::testing::Values(
+        GrammarFileCase{"forstat_init_assign", "forstat_init_assign"},
+        GrammarFileCase{"forstat_init_null", "forstat_init_null"},
+        GrammarFileCase{"forstat_init_swap", "forstat_init_swap"},
+        GrammarFileCase{"forstat_step_assign", "forstat_step_assign"},
+        GrammarFileCase{"forstat_step_null", "forstat_step_null"}),
+    [](const ::testing::TestParamInfo<GrammarFileCase>& info) {
+        return info.param.name;
+    });
+
+// ForExpression -> Expression | epsilon => "true"
+INSTANTIATE_TEST_SUITE_P(
+    ForExp, ParserGrammarFileTest,
+    ::testing::Values(
+        GrammarFileCase{"forexp_expression", "forexp_expression"},
+        GrammarFileCase{"forexp_true", "forexp_true"}),
+    [](const ::testing::TestParamInfo<GrammarFileCase>& info) {
+        return info.param.name;
+    });
+
+// for '(' ForStatement ';' ForExpression ';' ForStatement ')' Statement => "for"(4)
+INSTANTIATE_TEST_SUITE_P(
+    ForLoop, ParserGrammarFileTest,
+    ::testing::Values(
+        GrammarFileCase{"forloop_full", "forloop_full"},
+        GrammarFileCase{"forloop_null_step", "forloop_null_step"},
+        GrammarFileCase{"forloop_true_exp", "forloop_true_exp"},
+        GrammarFileCase{"forloop_init_only", "forloop_init_only"},
+        GrammarFileCase{"forloop_null_init", "forloop_null_init"},
+        GrammarFileCase{"forloop_exp_only", "forloop_exp_only"},
+        GrammarFileCase{"forloop_step_only", "forloop_step_only"},
+        GrammarFileCase{"forloop_all_null", "forloop_all_null"}),
+    [](const ::testing::TestParamInfo<GrammarFileCase>& info) {
+        return info.param.name;
+    });
+
 // Body -> 'begin' Statement list ';' 'end' => "block"
 INSTANTIATE_TEST_SUITE_P(
     Body, ParserGrammarFileTest,
@@ -230,6 +437,18 @@ INSTANTIATE_TEST_SUITE_P(
     });
 
 class ParserGrammarTest : public ::testing::Test {};
+
+TEST_F(ParserGrammarTest, DumpGrammarStemFromEnv) {
+    const char* stem = std::getenv("GRAMMAR_STEM");
+    if (stem == nullptr) {
+        GTEST_SKIP() << "Set GRAMMAR_STEM to dump a single grammar golden tree";
+    }
+    Logger::init("DumpGrammarStem");
+    auto result = parseSource(readFile(grammarPath(std::string(stem) + ".winzig")));
+    ASSERT_TRUE(result.success) << stem;
+    std::cout << treeToString(result.value.value());
+    delete result.value.value();
+}
 
 TEST_F(ParserGrammarTest, StringNode_UnterminatedFailsTokenize) {
     const char* source = R"(program t:

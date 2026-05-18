@@ -1,0 +1,7 @@
+program t:
+var x : integer;
+begin
+  case x of
+    1 .. 10: exit;
+  end;
+end t.

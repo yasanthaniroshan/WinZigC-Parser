@@ -1,0 +1,4 @@
+program t:
+begin
+  for (; ; ) exit;
+end t.

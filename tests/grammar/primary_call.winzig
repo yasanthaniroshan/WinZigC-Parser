@@ -1,0 +1,10 @@
+program t:
+
+function F ( a : integer ) : integer;
+begin
+  return a;
+end F;
+
+begin
+  output(F(1));
+end t.

@@ -1,0 +1,6 @@
+program t:
+var x : integer;
+    a : integer;
+begin
+  x := not a;
+end t.

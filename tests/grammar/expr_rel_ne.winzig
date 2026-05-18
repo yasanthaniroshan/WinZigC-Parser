@@ -1,0 +1,6 @@
+program t:
+var a : integer;
+    b : integer;
+begin
+  output(a <> b);
+end t.

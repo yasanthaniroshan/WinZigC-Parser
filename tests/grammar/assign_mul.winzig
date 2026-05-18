@@ -1,0 +1,7 @@
+program t:
+var x : integer;
+    a : integer;
+    b : integer;
+begin
+  x := a * b;
+end t.

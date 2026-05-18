@@ -1,0 +1,6 @@
+program t:
+var x : integer;
+    y : integer;
+begin
+  for (x :=: y; ; ) exit;
+end t.
