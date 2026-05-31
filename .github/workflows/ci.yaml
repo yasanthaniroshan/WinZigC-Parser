@@ -7,6 +7,9 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
 
     steps:
       - name: Checkout code
@@ -15,7 +18,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install -y cmake ninja-build g++ lcov
+          sudo apt install -y cmake ninja-build g++ lcov gcovr
 
       - name: Configure
         run: cmake -G Ninja -B build -DENABLE_COVERAGE=ON
@@ -31,3 +34,30 @@ jobs:
 
       - name: Remove test files
         run: lcov --remove coverage.info '*/tests/*' -o coverage.info
+
+      # CodeCoverageSummary reads Cobertura XML only (not lcov .info).
+      - name: Generate Cobertura XML
+        run: |
+          gcovr --root "${GITHUB_WORKSPACE}" \
+            --object-directory build \
+            --exclude '.*/tests/.*' \
+            --exclude '.*/_deps/.*' \
+            --xml -o cobertura.xml
+
+      - name: Coverage summary
+        uses: irongut/CodeCoverageSummary@v1.3.0
+        with:
+          filename: cobertura.xml
+          badge: true
+          fail_below_min: false
+          format: markdown
+          output: both
+
+      - name: Generate HTML coverage report
+        run: genhtml coverage.info --output-directory coverage-html
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage-html

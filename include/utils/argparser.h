@@ -12,11 +12,13 @@
 
 #include <memory>
 #include <string>
+#include <iostream>
 
 #include "CLI/CLI.hpp"
 #include "common/result.h"
 #include "common/error.h"
 #include "utils/logger.h"
+#include "version.h"
     
 struct ArgParserResult {
     std::string inputFile;
@@ -24,12 +26,14 @@ struct ArgParserResult {
     std::string logLevel = "INFO";
     std::string logFile = "logs/argparser.log";
     bool showVersion = false;
+    bool printAbstractSyntaxTree = false;
 
     bool operator==(const ArgParserResult& o) const {
         return inputFile == o.inputFile && outputFile == o.outputFile && showVersion == o.showVersion;
     }
 
     ArgParserResult(const std::string& inputFile, const std::string& outputFile) : inputFile(inputFile), outputFile(outputFile) {}
+    ArgParserResult(const std::string& inputFile, const std::string& outputFile, bool printAbstractSyntaxTree) : inputFile(inputFile), outputFile(outputFile), printAbstractSyntaxTree(printAbstractSyntaxTree) {}
 };
 
 struct ArgParserError : public Error {
@@ -51,6 +55,7 @@ private:
     char** _argv;
     std::unique_ptr<CLI::App> _app;
     bool _version = false;
+    bool _abstractSyntaxTree = false;
     std::string _logLevelStr;
     std::string _inputFileStr;
     std::string _outputFileStr;

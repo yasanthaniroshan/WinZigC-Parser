@@ -1,0 +1,4 @@
+program t:
+begin
+  output(ord('a'));
+end t.

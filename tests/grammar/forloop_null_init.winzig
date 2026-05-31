@@ -1,0 +1,5 @@
+program t:
+var i : integer;
+begin
+  for (; i <= 10; i := i + 1) exit;
+end t.

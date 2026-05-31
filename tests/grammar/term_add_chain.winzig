@@ -1,0 +1,7 @@
+program t:
+var a : integer;
+    b : integer;
+    c : integer;
+begin
+  output(a + b + c);
+end t.

@@ -1,0 +1,14 @@
+program t:
+
+function F ( x : integer ) : integer;
+const C = 1;
+type
+    E = ( on, off );
+var y : integer;
+begin
+y := C;
+return(y);
+end F;
+
+begin
+end t.

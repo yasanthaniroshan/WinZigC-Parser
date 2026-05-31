@@ -1,0 +1,5 @@
+program t:
+var x : integer;
+begin
+  output(x);
+end t.

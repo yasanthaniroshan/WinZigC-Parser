@@ -1,0 +1,4 @@
+program t:
+const Limit = MaxVal;
+begin
+end t.

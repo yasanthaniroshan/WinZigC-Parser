@@ -1,0 +1,4 @@
+program t:
+const A = 1, B = 'Z', C = Other;
+begin
+end t.

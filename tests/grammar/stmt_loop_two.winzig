@@ -1,0 +1,6 @@
+program t:
+var x : integer;
+    y : integer;
+begin
+  loop x := 1; y := 2; pool;
+end t.

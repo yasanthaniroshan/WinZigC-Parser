@@ -1,0 +1,5 @@
+program t:
+var x : integer;
+begin
+  x := ord('a');
+end t.

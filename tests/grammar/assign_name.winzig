@@ -1,0 +1,6 @@
+program t:
+var x : integer;
+    y : integer;
+begin
+  x := y;
+end t.

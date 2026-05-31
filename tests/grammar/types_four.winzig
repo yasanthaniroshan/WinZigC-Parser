@@ -1,0 +1,8 @@
+program t:
+type
+    A = ( one );
+    B = ( two );
+    C = ( three );
+    D = ( four );
+begin
+end t.

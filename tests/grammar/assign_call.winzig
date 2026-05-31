@@ -1,0 +1,11 @@
+program t:
+var x : integer;
+
+function F ( a : integer ) : integer;
+begin
+  return a;
+end F;
+
+begin
+  x := F(1);
+end t.

@@ -1,0 +1,8 @@
+program t:
+var a : integer;
+    b : integer;
+    c : integer;
+    d : integer;
+begin
+  output(a + b <= c * d);
+end t.

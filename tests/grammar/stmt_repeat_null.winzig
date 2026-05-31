@@ -1,0 +1,5 @@
+program t:
+var x : integer;
+begin
+  repeat ; until x = 1;
+end t.

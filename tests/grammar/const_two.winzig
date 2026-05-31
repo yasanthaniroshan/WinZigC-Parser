@@ -1,0 +1,4 @@
+program t:
+const First = 10, Second = 20;
+begin
+end t.

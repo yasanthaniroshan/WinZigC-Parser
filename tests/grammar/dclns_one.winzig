@@ -1,0 +1,4 @@
+program t:
+var n : integer;
+begin
+end t.

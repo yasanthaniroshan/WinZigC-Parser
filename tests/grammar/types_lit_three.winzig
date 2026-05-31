@@ -1,0 +1,5 @@
+program t:
+type
+    Result = ( Composite, Prime, TooBig );
+begin
+end t.

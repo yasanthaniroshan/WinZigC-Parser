@@ -1,0 +1,10 @@
+program t:
+
+function F ( x : integer ) : integer;
+var y : integer;
+begin
+return(y);
+end F;
+
+begin
+end t.

@@ -1,0 +1,4 @@
+program t:
+begin
+  return(0);
+end t.

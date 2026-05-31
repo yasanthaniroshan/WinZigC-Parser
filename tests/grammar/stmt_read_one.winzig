@@ -1,0 +1,5 @@
+program t:
+var x : integer;
+begin
+  read(x);
+end t.

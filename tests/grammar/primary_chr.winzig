@@ -1,0 +1,5 @@
+program t:
+var a : integer;
+begin
+  output(chr(a));
+end t.

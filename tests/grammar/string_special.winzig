@@ -1,0 +1,4 @@
+program t:
+begin
+  output("x1_!");
+end t.
