@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(WinZigCParser VERSION 0.1.1)
+project(WinZigCParser VERSION 1.0.0)
 enable_testing()
 
 set(CMAKE_CXX_STANDARD 17)
