@@ -1,5 +1,11 @@
 program hello:
+const A = 1, B = 'Z', C = A;
+type
 
+    Number = ( zero, one, two, three, four, five, six, seven, eight, nine );
+    color  = ( red, white, blue, green, purple, cyan, magenta, orange, black );
+
+var n,N,m:integer;
 begin
   output("Hello world");
 end hello.

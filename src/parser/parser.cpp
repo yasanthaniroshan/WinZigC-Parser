@@ -35,15 +35,15 @@ Result<TreeNode*> Parser::parseTree() {
 }
 
 // Parse the WinZigC program.
-Result<void> Parser::parse(bool printAbstractSyntaxTree) {
+Result<TreeNode*> Parser::parse(bool printAbstractSyntaxTree) {
     auto result = parseTree();
     if (!result.success) {
-        return Result<void>::Err(ParserError(result.error_message.value_or("parse failed")));
+        return Result<TreeNode*>::Err(ParserError(result.error_message.value_or("parse failed")));
     }
     if (printAbstractSyntaxTree) {
         printTree(result.value.value(), 0);
     }
-    return Result<void>::Ok();
+    return Result<TreeNode*>::Ok(result.value.value());
 }
 
 // Check if the end of the tokens is reached.

@@ -7,6 +7,7 @@
 #include "utils/filereader.h"
 #include "tokenizer/tokenizer.h"
 #include "parser/parser.h"
+#include "semantic_analyzer/analyzer.h"
 
 int main(int argc, char** argv) {
     Logger::init("WinZigCParser");
@@ -48,5 +49,11 @@ int main(int argc, char** argv) {
         return 1;
     }
     LOG_DEBUG("Parser parsed successfully");
+    auto semanticAnalyzer = SemanticAnalyzer(parserResult.value.value());
+    auto semanticResult = semanticAnalyzer.analyze();
+    if (!semanticResult.success) {
+        LOG_ERROR(semanticResult.error_message.value());
+        return 1;
+    }
     return 0;
 }
