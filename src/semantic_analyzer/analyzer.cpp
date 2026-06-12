@@ -48,6 +48,7 @@ void SemanticAnalyzer::analyzeProgram(TreeNode* node) {
     analyzeConsts(consts);
     analyzeTypes(types);
     analyzeDclns(dclns);
+    analyzeSubprogs(subprogs);
 }
 
 void SemanticAnalyzer::analyzeConsts(TreeNode* node) {
@@ -187,4 +188,58 @@ void SemanticAnalyzer::analyzeDcln(TreeNode* node) {
     }
 }
 
+
+void SemanticAnalyzer::analyzeSubprogs(TreeNode* node) {
+    TreeNode* current = node;
+    if (current->left == nullptr) {
+        LOG_INFO("No subprograms declared.");
+        return;
+    }
+    LOG_INFO("Node value for subprograms: " + current->value);
+    current = current->left; // Move to the first subprogram declaration
+    while (current != nullptr) {
+        analyzeFcn(current); // Analyze each subprogram declaration
+        current = current->right; // Move to the next sibling
+    }
+    // Implementation for analyzing subprograms (functions/procedures)
+}
+
+void SemanticAnalyzer::analyzeFcn(TreeNode* node) {
+    TreeNode* identifierNode = node->left; // First child is the function name
+    TreeNode* paramsNode = identifierNode->right; // Next sibling is the parameters node    
+    TreeNode* returnTypeNode = paramsNode->right; // Next sibling is the return type node
+    TreeNode* constsNode = returnTypeNode->right; // Next sibling is the constants node
+    TreeNode* typesNode = constsNode->right; // Next sibling is the types node
+    TreeNode* dclnsNode = typesNode->right; // Next sibling is the declarations node
+    TreeNode* bodyNode = dclnsNode->right; // Next sibling is the body of the function
+    TreeNode* endNameNode = bodyNode->right; // Next sibling is the end name of the function
+    symbolTable.enterScope(); // Enter a new scope for the function
+    analyzeParams(paramsNode);
+    // Need to analyze return type
+    analyzeConsts(constsNode);
+    analyzeTypes(typesNode);
+    analyzeDclns(dclnsNode);
+    symbolTable.exitScope(); // Leave the function scope
+    // Need to analyze the body of the function
+    if (identifierNode->left->value != endNameNode->left->value) {
+        LOG_ERROR("Function '" + identifierNode->left->value + "' end name '" + endNameNode->left->value + "' does not match.");
+        return;
+    }
+        // Implementation for analyzing a function declaration
+}
+
+void SemanticAnalyzer::analyzeParams(TreeNode* node) {
+    TreeNode* current = node;
+    if (current->left == nullptr) {
+        LOG_ERROR("No parameters declared."); // looks like this language requires parameters for functions, so this is an error
+        return;
+    }
+    LOG_INFO("Node value for parameters: " + current->value);
+    current = current->left; // Move to the first parameter declaration
+    while (current != nullptr) {
+        analyzeDcln(current); // Parameters have the same structure as variable declarations, so we can reuse that analysis
+        current = current->right; // Move to the next sibling
+    }
+    // Implementation for analyzing function parameters
+}
 

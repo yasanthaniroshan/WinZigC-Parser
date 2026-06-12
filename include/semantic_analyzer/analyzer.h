@@ -31,6 +31,11 @@ private:
     void analyzeDclns(TreeNode* node);
     void analyzeDcln(TreeNode* node);
 
+    void analyzeSubprogs(TreeNode* node);
+    void analyzeFcn(TreeNode* node);
+    void analyzeParams(TreeNode* node);
+
+
     void analyzeAssign(TreeNode* node);
     int countChildren(TreeNode* node);
 
