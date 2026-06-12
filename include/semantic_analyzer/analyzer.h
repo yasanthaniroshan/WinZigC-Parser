@@ -28,6 +28,9 @@ private:
     void analyzeType(TreeNode* node);
     void analyzeLiteralList(TreeNode* node);
 
+    void analyzeDclns(TreeNode* node);
+    void analyzeDcln(TreeNode* node);
+
     void analyzeAssign(TreeNode* node);
     int countChildren(TreeNode* node);
 

@@ -47,6 +47,7 @@ void SemanticAnalyzer::analyzeProgram(TreeNode* node) {
     TreeNode* endName = body->right; // Next sibling is the end name of the program
     analyzeConsts(consts);
     analyzeTypes(types);
+    analyzeDclns(dclns);
 }
 
 void SemanticAnalyzer::analyzeConsts(TreeNode* node) {
@@ -129,6 +130,61 @@ void SemanticAnalyzer::analyzeType(TreeNode* node) {
         return;
     }
     LOG_INFO("Declared type '" + typeName + "' with literals: " + std::to_string(typeSymbol.members.size()));
-    // symbolTable.printAllScopes();
     return;
 }
+
+void SemanticAnalyzer::analyzeDclns(TreeNode* node) {
+    TreeNode* current = node;
+    if (current->left == nullptr) {
+        LOG_INFO("No declarations made.");
+        return;
+    }
+    LOG_INFO("Node value for declarations: " + current->value);
+    current = current->left; // Move to the first declaration
+    while (current != nullptr) {
+        analyzeDcln(current); // Analyze each declaration
+        current = current->right; // Move to the next sibling
+    }
+}
+
+void SemanticAnalyzer::analyzeDcln(TreeNode* node) {
+    LOG_INFO("Analyzing declaration: " + node->value);
+    TreeNode* current_node = node->left; // First child is the one of the identifiers
+    TreeNode* typeNode = nullptr; // Last sibling is the type node
+    int identifierCount = 0;
+    while(current_node != nullptr)
+    {
+        identifierCount++;
+        typeNode = current_node; // Update type node
+        current_node = current_node->right; // Move to the next sibling
+    }
+    LOG_INFO("Type node value: " + typeNode->left->value);
+    TreeNode* variable_node = node->left; // First child is the first variable identifier
+    for(int i = 0; i < identifierCount - 1; i++) {
+        Symbol varSymbol;
+        varSymbol.name = variable_node->left->value; // The actual variable name is the left child of the identifier node
+        varSymbol.kind = SymbolKind::Variable;
+        auto isDefined = symbolTable.lookup(varSymbol.name);
+        if (isDefined != nullptr) {
+            LOG_ERROR("Variable '" + varSymbol.name + "' is already declared in the current scope.");
+            return;
+        }
+        varSymbol.type = Symbol::getSymbolType(typeNode->left->value);
+        if (varSymbol.type == SymbolType::UserDefined) {
+            auto typeSymbol = symbolTable.lookup(typeNode->left->value);
+            if (typeSymbol == nullptr) {
+                LOG_ERROR("Type '" + typeNode->left->value + "' for variable '" + varSymbol.name + "' is not declared.");
+                return; 
+            }
+            varSymbol.typeName = typeNode->left->value;
+        }
+        if (!symbolTable.declare(varSymbol)) {
+            LOG_ERROR("Variable '" + varSymbol.name + "' is already declared in the current scope.");
+            return;
+        }
+        LOG_INFO("Declared variable '" + varSymbol.name + "' of type '" + symbolTypeToString(varSymbol.type) + "'.");
+        variable_node = variable_node->right; // Move to the next sibling
+    }
+}
+
+
