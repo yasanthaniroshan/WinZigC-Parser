@@ -49,6 +49,7 @@ void SemanticAnalyzer::analyzeProgram(TreeNode* node) {
     analyzeTypes(types);
     analyzeDclns(dclns);
     analyzeSubprogs(subprogs);
+    analyzeBody(body);
 }
 
 void SemanticAnalyzer::analyzeConsts(TreeNode* node) {
@@ -165,11 +166,11 @@ void SemanticAnalyzer::analyzeDcln(TreeNode* node) {
         Symbol varSymbol;
         varSymbol.name = variable_node->left->value; // The actual variable name is the left child of the identifier node
         varSymbol.kind = SymbolKind::Variable;
-        auto isDefined = symbolTable.lookup(varSymbol.name);
-        if (isDefined != nullptr) {
-            LOG_ERROR("Variable '" + varSymbol.name + "' is already declared in the current scope.");
-            return;
-        }
+        // auto isDefined = symbolTable.lookup(varSymbol.name);
+        // if (isDefined != nullptr) {
+        //     LOG_ERROR("Variable '" + varSymbol.name + "' is already declared in the current scope.");
+        //     return;
+        // }
         varSymbol.type = Symbol::getSymbolType(typeNode->left->value);
         if (varSymbol.type == SymbolType::UserDefined) {
             auto typeSymbol = symbolTable.lookup(typeNode->left->value);
@@ -219,8 +220,8 @@ void SemanticAnalyzer::analyzeFcn(TreeNode* node) {
     analyzeConsts(constsNode);
     analyzeTypes(typesNode);
     analyzeDclns(dclnsNode);
+    analyzeBody(bodyNode);
     symbolTable.exitScope(); // Leave the function scope
-    // Need to analyze the body of the function
     if (identifierNode->left->value != endNameNode->left->value) {
         LOG_ERROR("Function '" + identifierNode->left->value + "' end name '" + endNameNode->left->value + "' does not match.");
         return;
@@ -243,3 +244,53 @@ void SemanticAnalyzer::analyzeParams(TreeNode* node) {
     // Implementation for analyzing function parameters
 }
 
+void SemanticAnalyzer::analyzeBody(TreeNode* node) {
+    // Implementation for analyzing the body of a function or the main program
+    TreeNode* current = node;
+    if (current->left == nullptr) {
+        LOG_ERROR("No statements in body."); // looks like this language requires at least one statement in the body, so this is an error
+        return;
+    }
+    LOG_INFO("Node value for body: " + current->value);
+    current = current->left; // Move to the first statement
+    while (current != nullptr) {
+        // Analyze each statement based on its type (e.g., output statement, assignment, etc.)
+        analyzeStatement(current);
+        current = current->right; // Move to the next sibling
+    }
+
+}
+
+void SemanticAnalyzer::analyzeStatement(TreeNode* node) {
+    if (node->value == "output") {
+        analyzeOutputStatement(node);
+    } else if (node->value == "<null>") {
+        LOG_INFO("Analyzing null statement.");
+    } else {
+        LOG_ERROR("Unknown statement type: " + node->value);
+    }
+}
+
+void SemanticAnalyzer::analyzeOutputStatement(TreeNode* node) {
+    // Implementation for analyzing an output statement
+    TreeNode* current = node->left; // First child is the expression to output
+    LOG_INFO("Analyzing output statement.");
+    if (current->value == "string") {
+        LOG_INFO("Output statement with string literal: " + current->left->value);
+        return;
+    } else {
+        LOG_INFO("Output statement with expression.");
+        SemanticType exprType = analyzeExpression(current);
+        if(exprType != SemanticType::Integer && exprType != SemanticType::Char) 
+        {
+            LOG_ERROR("Output statement expects an integer or character expression.");
+            return;
+        }
+    }
+}
+
+SemanticType SemanticAnalyzer::analyzeExpression(TreeNode* node) {
+    // Implementation for analyzing an expression and determining its type
+    LOG_INFO("Analyzing expression with node value: " + node->value);
+    return SemanticType::Unknown;
+}

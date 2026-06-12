@@ -9,6 +9,14 @@
 #include "tokenizer/tokenizer.h"
 #include "semantic_analyzer/symbol.h"
 
+enum class SemanticType {
+    Integer,
+    Char,
+    String,
+    Boolean,
+    UserDefined,
+    Unknown
+};
 class SemanticAnalyzer {
 public:
     SemanticAnalyzer(TreeNode* ast);
@@ -34,6 +42,14 @@ private:
     void analyzeSubprogs(TreeNode* node);
     void analyzeFcn(TreeNode* node);
     void analyzeParams(TreeNode* node);
+
+    void analyzeBody(TreeNode* node);
+
+    void analyzeStatement(TreeNode* node);
+    void analyzeOutputStatement(TreeNode* node);
+
+
+    SemanticType analyzeExpression(TreeNode* node);
 
 
     void analyzeAssign(TreeNode* node);

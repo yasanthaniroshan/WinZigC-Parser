@@ -1,19 +1,4 @@
 program hello:
-const A = 1, B = 'Z', C = A;
-type
-
-    Number = ( zero, one, two, three, four, five, six, seven, eight, nine );
-    color  = ( red, white, blue, green, purple, cyan, magenta, orange, black );
-
-var n,N,m:integer;
-function Factor ( i : integer ):integer;
-var
-    j : integer;
-begin
-    if i > 0 then
-	for (j := 1; j <= i; j:=j+1) 
-	    if i mod j = 0 then output ( j )
-end Factor;
 begin
   output("Hello world");
 end hello.
