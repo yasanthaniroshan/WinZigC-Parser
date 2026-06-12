@@ -21,6 +21,7 @@ class SemanticAnalyzer {
 public:
     SemanticAnalyzer(TreeNode* ast);
     ~SemanticAnalyzer();
+    SymbolTable getSymbolTable() const { return symbolTable; }
     Result<void> analyze();
 
 private:

@@ -8,6 +8,7 @@
 #include "tokenizer/tokenizer.h"
 #include "parser/parser.h"
 #include "semantic_analyzer/analyzer.h"
+#include "code_generator/generator.h"
 
 int main(int argc, char** argv) {
     Logger::init("WinZigCParser");
@@ -53,6 +54,12 @@ int main(int argc, char** argv) {
     auto semanticResult = semanticAnalyzer.analyze();
     if (!semanticResult.success) {
         LOG_ERROR(semanticResult.error_message.value());
+        return 1;
+    }
+    auto codeGenerator = CodeGenerator(parserResult.value.value(), semanticAnalyzer.getSymbolTable());
+    auto codeGenerationResult = codeGenerator.generate();
+    if (!codeGenerationResult.success) {
+        LOG_ERROR(codeGenerationResult.error_message.value());
         return 1;
     }
     return 0;

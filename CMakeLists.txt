@@ -86,6 +86,11 @@ target_include_directories(semantic_analyzer PUBLIC
 )
 target_link_libraries(semantic_analyzer PUBLIC common winzig_log tree tokenizer parser)
 
+add_library(code_generator src/code_generator/generator.cpp)
+target_include_directories(code_generator PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+)
+target_link_libraries(code_generator PUBLIC common winzig_log tree tokenizer parser semantic_analyzer)
 add_library(utils
     src/utils/argparser.cpp
     src/utils/filereader.cpp
@@ -98,7 +103,7 @@ target_link_libraries(utils PUBLIC common winzig_log CLI11::CLI11)
 
 # --- Executables ---
 add_executable(winzigc app/main.cpp)
-target_link_libraries(winzigc PRIVATE utils semantic_analyzer)
+target_link_libraries(winzigc PRIVATE utils code_generator)
 
 add_executable(tests
     tests/unit/test_argparser.cpp
