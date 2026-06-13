@@ -1,6 +1,6 @@
 #include "code_generator/generator.h"
 
-CodeGenerator::CodeGenerator(TreeNode *ast, SymbolTable symbolTable) : ast(ast), symbolTable(symbolTable)
+CodeGenerator::CodeGenerator(TreeNode *ast, SymbolTable symbolTable, std::string outputFile) : ast(ast), symbolTable(symbolTable), outputFile(outputFile)
 {
 }
 
@@ -14,6 +14,7 @@ Result<void> CodeGenerator::generate()
     LOG_INFO("Starting code generation.");
     generateProgram(ast, CodeInput(0, 0));
     printGeneratedCode();
+    saveGeneratedCode();
     return Result<void>::Ok();
 }
 
@@ -95,30 +96,35 @@ Result<CodeResult> CodeGenerator::generateOutputStatement(TreeNode *node, CodeIn
     // TODO: implement output statement code generation
     TreeNode *current = node->left; // First child is the expression to output
     LOG_INFO("Generating code for output statement with node value: " + current->value);
-    Result<CodeResult> stringResult = Result<CodeResult>::Ok(CodeResult(input.stackPointer, input.nextInstruction));
+    Result<CodeResult> stringResult;
     if (current->value == "string")
     {
         stringResult = generateString(current, input);
     }
     else
     {
-        // For simplicity, we will just generate code to print the value of the expression without evaluating it
-        LOG_INFO("Generating code for output statement with expression: " + current->value);
+        stringResult = generateExpression(current, input); // Assuming generateExpression is implemented to handle other types of expressions
     }
     CodeResult result;
     result.stackPointer = stringResult.value->stackPointer + 1;       // Example of modifying the stack pointer for the output statement
     result.nextInstruction = stringResult.value->nextInstruction + 1; // Example of modifying the next instruction
-    generatedCode.push_back("print");               // Example of adding a line of code to the generated code
+    generatedCode.push_back("print");                                 // Example of adding a line of code to the generated code
     return Result<CodeResult>::Ok(result);
 }
 
 Result<CodeResult> CodeGenerator::generateString(TreeNode *node, CodeInput input)
 {
-    TreeNode *stringLiteralNode = node->left;           // First child is the string literal
+    TreeNode *stringLiteralNode = node->left;                 // First child is the string literal
     std::string stringValue = stringLiteralNode->left->value; // Get the string value
     CodeResult result;
     result.stackPointer = input.stackPointer + 1;            // Example of modifying the stack pointer for the string literal
     result.nextInstruction = input.nextInstruction + 1;      // Example of modifying the next instruction
-    generatedCode.push_back("load \"" + stringValue + "\""); // Example of adding a line of code to load the string literal
+    generatedCode.push_back("lits \"" + stringValue + "\""); // Example of adding a line of code to load the string literal
     return Result<CodeResult>::Ok(result);
+}
+
+Result<CodeResult> CodeGenerator::generateExpression(TreeNode *node, CodeInput input)
+{
+    LOG_INFO("Generating code for expression with node value: " + node->value);
+    return Result<CodeResult>::Ok(CodeResult(0, 0));
 }
