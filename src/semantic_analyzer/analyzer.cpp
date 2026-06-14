@@ -54,6 +54,11 @@ void SemanticAnalyzer::analyzeProgram(TreeNode *node)
     }
     TreeNode *body = subprogs->right; // Next sibling is the body of the program
     TreeNode *endName = body->right;  // Next sibling is the end name of the program
+    if (name->left->value != endName->left->value)
+    {
+        LOG_ERROR("Program name '" + name->left->value + "' end name '" + endName->left->value + "' does not match.");
+        return;
+    }
     analyzeConsts(consts);
     analyzeTypes(types);
     analyzeDclns(dclns);
@@ -91,15 +96,15 @@ void SemanticAnalyzer::analyzeConst(TreeNode *node)
         return;
     }
     TreeNode *constValue = identifierNode->right; // Next sibling is the constant value
-    if (constValue == nullptr)
-    {
-        LOG_ERROR("Constant '" + constSymbol.name + "' is missing a value.");
-        return;
-    }
+    // if (constValue == nullptr)
+    // {
+    //     LOG_ERROR("Constant '" + constSymbol.name + "' is missing a value.");
+    //     return;
+    // }
     if (isIntegerLiteral(constValue))
     {
         constSymbol.type = SymbolType::Integer;
-        constSymbol.ordinal = std::stoi(constValue->left->value); // Assign the integer value as ordinal    
+        constSymbol.ordinal = std::stoi(constValue->left->value); // Assign the integer value as ordinal
     }
     else if (isCharLiteral(constValue))
     {
@@ -155,7 +160,6 @@ void SemanticAnalyzer::analyzeType(TreeNode *node)
     while (currentLiteral != nullptr)
     {
         typeSymbol.members.push_back(currentLiteral->left->value); // Add the literal to the list
-
         currentLiteral = currentLiteral->right; // Move to the next sibling
     }
     if (!symbolTable.declare(typeSymbol))
@@ -170,7 +174,7 @@ void SemanticAnalyzer::analyzeType(TreeNode *node)
         memberSymbol.name = member;
         memberSymbol.kind = SymbolKind::Constant; // Members of a user-defined type are treated as constants
         memberSymbol.type = SymbolType::UserDefined;
-        memberSymbol.typeName = typeName; // Set the type name for the member
+        memberSymbol.typeName = typeName;      // Set the type name for the member
         memberSymbol.ordinal = ordinalValue++; // Assign an ordinal value to the member
         if (!symbolTable.declare(memberSymbol))
         {
@@ -218,11 +222,6 @@ void SemanticAnalyzer::analyzeDcln(TreeNode *node)
         Symbol varSymbol;
         varSymbol.name = variable_node->left->value; // The actual variable name is the left child of the identifier node
         varSymbol.kind = SymbolKind::Variable;
-        // auto isDefined = symbolTable.lookup(varSymbol.name);
-        // if (isDefined != nullptr) {
-        //     LOG_ERROR("Variable '" + varSymbol.name + "' is already declared in the current scope.");
-        //     return;
-        // }
         varSymbol.type = Symbol::getSymbolType(typeNode->left->value);
         if (varSymbol.type == SymbolType::UserDefined)
         {
@@ -272,6 +271,11 @@ void SemanticAnalyzer::analyzeFcn(TreeNode *node)
     TreeNode *dclnsNode = typesNode->right;       // Next sibling is the declarations node
     TreeNode *bodyNode = dclnsNode->right;        // Next sibling is the body of the function
     TreeNode *endNameNode = bodyNode->right;      // Next sibling is the end name of the function
+    if (identifierNode->left->value != endNameNode->left->value)
+    {
+        LOG_ERROR("Function '" + identifierNode->left->value + "' end name '" + endNameNode->left->value + "' does not match.");
+        return;
+    }
     symbolTable.enterScope();                     // Enter a new scope for the function
     analyzeParams(paramsNode);
     // Need to analyze return type
@@ -280,11 +284,6 @@ void SemanticAnalyzer::analyzeFcn(TreeNode *node)
     analyzeDclns(dclnsNode);
     analyzeBody(bodyNode);
     symbolTable.exitScope(); // Leave the function scope
-    if (identifierNode->left->value != endNameNode->left->value)
-    {
-        LOG_ERROR("Function '" + identifierNode->left->value + "' end name '" + endNameNode->left->value + "' does not match.");
-        return;
-    }
     // Implementation for analyzing a function declaration
 }
 
@@ -327,9 +326,29 @@ void SemanticAnalyzer::analyzeBody(TreeNode *node)
 
 void SemanticAnalyzer::analyzeStatement(TreeNode *node)
 {
+    printTree(node, 0);
     if (node->value == "output")
     {
-        analyzeOutputStatement(node);
+        analyzeOutputStatement(node->left); // Since rule exsists go to next level in the tree
+    }
+    else if (node->value == "if")
+    {
+        LOG_INFO("Analyzing if statement.");
+        int childCount = countChildren(node->left);
+        TreeNode *conditionNode = node->left;      // First child is the condition
+        TreeNode *thenNode = conditionNode->right; // Next sibling is the 'then' part
+        if (childCount > 2)
+        {
+            // Handle the 'else' part if it exists
+            TreeNode *elseNode = thenNode->right; // Next sibling is the 'else' part
+        }
+        SemanticType conditionType = analyzeExpression(conditionNode);
+        if (conditionType != SemanticType::Boolean)
+        {
+            LOG_ERROR("Condition in 'if' statement must be of boolean type.");
+            return;
+        }
+        LOG_INFO("Finished analyzing if statement.");
     }
     else if (node->value == "<null>")
     {
@@ -337,35 +356,228 @@ void SemanticAnalyzer::analyzeStatement(TreeNode *node)
     }
     else
     {
-        LOG_ERROR("Unknown statement type: " + node->value);
+        LOG_INFO("Analyzing assignment statement.");
+        analyzeAssignment(node); // if no specific rule exists, pass direct tree
     }
+}
+
+void SemanticAnalyzer::analyzeAssignment(TreeNode *node)
+{ // Handle Leave Nodes
+    TreeNode *current = node;
+    if (current->value == "assign")
+    {
+        TreeNode *leftNode = current->left;    // The actual identifier is the left child of the first child
+        TreeNode *rightNode = leftNode->right; // The expression being assigned is the right
+        SemanticType exprType = analyzeExpression(rightNode);
+        Symbol *sym = symbolTable.lookup(leftNode->left->value);
+        if (sym == nullptr)
+        {
+            LOG_ERROR("Identifier '" + leftNode->left->value + "' is not declared.");
+            return;
+        }
+        if (getSemanticTypeFromSymbolType(sym->type) != exprType)
+        {
+            LOG_ERROR("Type mismatch in assignment to '" + leftNode->value + "'. Expected type: " + symbolTypeToString(sym->type) + ", but got: " + std::to_string(static_cast<int>(exprType)));
+            return;
+        }
+    }
+    else if (current->value == "swap")
+    {
+        TreeNode *leftNode = current->left;    // The first identifier is the left child of the first child
+        TreeNode *rightNode = leftNode->right; // The second identifier is the right child of the first child
+        SemanticType leftType, rightType;
+        Symbol *leftSym = symbolTable.lookup(leftNode->left->value);
+        Symbol *rightSym = symbolTable.lookup(rightNode->left->value);
+        if (leftSym == nullptr || rightSym == nullptr)
+        {
+            LOG_ERROR("One of the identifiers in the swap statement is not declared.");
+            return;
+        }
+        leftType = getSemanticTypeFromSymbolType(leftSym->type);
+        rightType = getSemanticTypeFromSymbolType(rightSym->type);
+        if (leftType != rightType)
+        {
+            LOG_ERROR("Type mismatch in swap statement. '" + leftNode->left->value + "' has type '" + symbolTypeToString(leftSym->type) + "', but '" + rightNode->left->value + "' has type '" + symbolTypeToString(rightSym->type) + "'.");
+            return;
+        }
+    }
+    return;
 }
 
 void SemanticAnalyzer::analyzeOutputStatement(TreeNode *node)
 {
-    // Implementation for analyzing an output statement
     TreeNode *current = node->left; // First child is the expression to output
-    LOG_INFO("Analyzing output statement.");
-    if (current->value == "string")
+    int childCount = 0;
+    TreeNode *temp = current;
+    while (temp != nullptr)
     {
-        LOG_INFO("Output statement with string literal: " + current->left->value);
-        return;
+        childCount++;
+        temp = temp->right; // Move to the next sibling
     }
-    else
+    LOG_INFO("Child count for output statement: " + std::to_string(childCount));
+    LOG_INFO("Child count for output statement: " + std::to_string(countChildren(node->left)));
+
+    for (int i = 0; i < childCount; i++)
     {
-        LOG_INFO("Output statement with expression.");
-        SemanticType exprType = analyzeExpression(current);
-        if (exprType != SemanticType::Integer && exprType != SemanticType::Char)
+        // Handle Leave Nodes
+        LOG_INFO("Analyzing output statement.");
+        if (current->value == "string")
         {
-            LOG_ERROR("Output statement expects an integer or character expression.");
+            LOG_INFO("Output statement with string literal: " + current->left->value);
             return;
         }
+        else
+        {
+            LOG_INFO("Output statement with expression.");
+            SemanticType exprType = analyzeExpression(current);
+            if (exprType != SemanticType::Integer && exprType != SemanticType::Char)
+            {
+                LOG_ERROR("Output statement expects an integer or character expression.");
+                return;
+            }
+        }
+        current = current->right; // Move to the next sibling
     }
 }
 
 SemanticType SemanticAnalyzer::analyzeExpression(TreeNode *node)
 {
     // Implementation for analyzing an expression and determining its type
+    TreeNode *current = node;
+    if (current->value == "<=" || current->value == "<" || current->value == ">" || current->value == ">=" || current->value == "<>" || current->value == "=")
+    {
+        LOG_INFO("Analyzing relational expression with operator: " + current->value);
+        TreeNode *leftNode = current->left;    // First child is the left operand
+        TreeNode *rightNode = leftNode->right; // Next sibling is the right operand
+        // Handle Leave Nodes
+        SemanticType leftType = analyzeTerm(leftNode);
+        SemanticType rightType = analyzeTerm(rightNode);
+        if (leftType != rightType)
+        {
+            LOG_ERROR("Type mismatch in relational expression. Left operand has type '" + std::to_string(static_cast<int>(leftType)) + "', but right operand has type '" + std::to_string(static_cast<int>(rightType)) + "'.");
+            return SemanticType::Unknown;
+        }
+        if (current->value == "<>" || current->value == "=")
+        {
+            if (leftType == SemanticType::Char && rightType == SemanticType::Char)
+            {
+                return SemanticType::Boolean;
+            }
+            if (leftType == SemanticType::String && rightType == SemanticType::String)
+            {
+                return SemanticType::Boolean;
+            }
+            LOG_INFO("Analyzing not equal expression.");
+        }
+        if (leftType == SemanticType::Integer && rightType == SemanticType::Integer)
+        {
+            return SemanticType::Boolean;
+        }
+        else if (leftType == SemanticType::UserDefined && rightType == SemanticType::UserDefined)
+        {
+            return SemanticType::Boolean;
+        }
+        return SemanticType::Unknown; // If types are not compatible for relational expressions, return unknown
+    }
+    else
+    {
+        LOG_INFO("Analyzing term with operator: " + current->value);
+        return analyzeTerm(node);
+    }
     LOG_INFO("Analyzing expression with node value: " + node->value);
     return SemanticType::Unknown;
+}
+
+SemanticType SemanticAnalyzer::analyzeTerm(TreeNode *node)
+{
+    // Implementation for analyzing a term and determining its type
+    TreeNode *current = node;
+    // Handle Leave Nodes
+    if (current->value == "+")
+    {
+        LOG_INFO("Analyzing addition expression.");
+    }
+    else if (current->value == "-")
+    {
+        LOG_INFO("Analyzing subtraction expression.");
+    }
+    else if (current->value == "or")
+    {
+        LOG_INFO("Analyzing logical OR expression.");
+    }
+    else
+    {
+        LOG_INFO("Analyzing factor with operator: " + current->value);
+        return analyzeFactor(node);
+    }
+    LOG_INFO("Analyzing term with node value: " + node->value);
+    return SemanticType::Unknown;
+}
+
+SemanticType SemanticAnalyzer::analyzeFactor(TreeNode *node)
+{
+    // Implementation for analyzing a factor and determining its type
+    TreeNode *current = node;
+    // Handle Leave Nodes
+    if (current->value == "*")
+    {
+        LOG_INFO("Analyzing multiplication expression.");
+    }
+    else if (current->value == "/")
+    {
+        LOG_INFO("Analyzing division expression.");
+    }
+    else if (current->value == "and")
+    {
+        LOG_INFO("Analyzing logical AND expression.");
+    }
+    else if (current->value == "mod")
+    {
+        LOG_INFO("Analyzing modulo expression.");
+    }
+    else
+    {
+        LOG_INFO("Analyzing primary : " + current->value);
+        return analyzePrimary(node);
+    }
+    LOG_INFO("Analyzing factor with unknown operator: " + current->value);
+    return SemanticType::Unknown;
+}
+
+SemanticType SemanticAnalyzer::analyzePrimary(TreeNode *node)
+{
+    // Implementation for analyzing a primary and determining its type
+    TreeNode *current = node;
+    // Handle Leave Nodes
+    if (current->value == "<integer>")
+    {
+        LOG_INFO("Analyzing integer literal: " + current->left->value);
+        return SemanticType::Integer;
+    }
+    else if (current->value == "<char>")
+    {
+        LOG_INFO("Analyzing character literal: " + current->left->value);
+        return SemanticType::Char;
+    }
+    else if (current->value == "<string>")
+    {
+        LOG_INFO("Analyzing string literal: " + current->left->value);
+        return SemanticType::String;
+    }
+    else if (current->value == "<identifier>")
+    {
+        LOG_INFO("Analyzing identifier: " + current->left->value);
+        Symbol *sym = symbolTable.lookup(current->left->value);
+        if (sym == nullptr)
+        {
+            LOG_ERROR("Identifier '" + current->left->value + "' is not declared.");
+            return SemanticType::Unknown;
+        }
+        return getSemanticTypeFromSymbolType(sym->type);
+    }
+    else
+    {
+        LOG_ERROR("Unknown primary expression with node value: " + current->value);
+        return SemanticType::Unknown;
+    }
 }

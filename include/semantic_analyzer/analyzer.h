@@ -47,10 +47,15 @@ private:
     void analyzeBody(TreeNode* node);
 
     void analyzeStatement(TreeNode* node);
+    void analyzeAssignment(TreeNode* node);
+
     void analyzeOutputStatement(TreeNode* node);
 
 
     SemanticType analyzeExpression(TreeNode* node);
+    SemanticType analyzeTerm(TreeNode* node);
+    SemanticType analyzeFactor(TreeNode* node);
+    SemanticType analyzePrimary(TreeNode* node);
 
 
     void analyzeAssign(TreeNode* node);
@@ -59,6 +64,15 @@ private:
     bool isIntegerLiteral(TreeNode* node);
     bool isCharLiteral(TreeNode* node);
 
+    static SemanticType getSemanticTypeFromSymbolType(SymbolType type) {
+        switch (type) {
+            case SymbolType::Integer: return SemanticType::Integer;
+            case SymbolType::Char: return SemanticType::Char;
+            case SymbolType::String: return SemanticType::String;
+            case SymbolType::UserDefined: return SemanticType::UserDefined;
+            default: return SemanticType::Unknown;
+        }
+    }
 
     // Helper functions for semantic analysis
 };

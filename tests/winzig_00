@@ -1,11 +1,5 @@
 program hello:
-const A = 1, B = 'Z', C = A;
-type
-
-    Number = ( zero, one, two, three, four, five, six, seven, eight, nine );
-    color  = ( red, white, blue, green, purple, cyan, magenta, orange, black );
-
-var n,N,m:integer;
+var x:integer; y:char;
 begin
-  output("Hello world");
+  if x > 0 then output(x) else output(y);
 end hello.

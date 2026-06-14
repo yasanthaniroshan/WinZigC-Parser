@@ -6,7 +6,7 @@
 #include <vector>
 
 enum class SymbolKind { Variable, Constant, Type, Function };
-enum class SymbolType { Integer, Char, String, UserDefined };
+enum class SymbolType { Integer, Char, String, Boolean, UserDefined };
 
 inline std::string symbolKindToString(SymbolKind kind) {
     switch (kind) {
@@ -22,6 +22,7 @@ inline std::string symbolTypeToString(SymbolType type) {
         case SymbolType::Integer: return "Integer";
         case SymbolType::Char: return "Char";
         case SymbolType::String: return "String";
+        case SymbolType::Boolean: return "Boolean";
         case SymbolType::UserDefined: return "UserDefined";
         default: return "Unknown";
     }
@@ -46,6 +47,7 @@ struct Symbol {
         if (type == "integer") return SymbolType::Integer;
         if (type == "char") return SymbolType::Char;
         if (type == "string") return SymbolType::String;
+        if (type == "boolean") return SymbolType::Boolean;
         return SymbolType::UserDefined;
     }
 
