@@ -34,6 +34,8 @@ struct Symbol {
     SymbolType type;
     int paramCount;         // only meaningful for functions
 
+    int ordinal = 0;
+
     std::vector<std::string> members; // only meaningful for user-defined types
 
     Symbol(std::string name, SymbolType type) : name(std::move(name)), type(type) {}

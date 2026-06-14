@@ -73,6 +73,9 @@ void SymbolTable::printAllScopes() {
                 }
                 std::cout << "]";
             }
+            if (sym.kind == SymbolKind::Constant){
+                std::cout << ", Ordinal: " << sym.ordinal;
+            }
             std::cout << std::endl;
         }
     }
