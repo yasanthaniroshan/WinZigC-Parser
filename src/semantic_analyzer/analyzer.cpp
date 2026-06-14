@@ -326,7 +326,6 @@ void SemanticAnalyzer::analyzeBody(TreeNode *node)
 
 void SemanticAnalyzer::analyzeStatement(TreeNode *node)
 {
-    printTree(node, 0);
     if (node->value == "output")
     {
         analyzeOutputStatement(node->left); // Since rule exsists go to next level in the tree
@@ -337,18 +336,57 @@ void SemanticAnalyzer::analyzeStatement(TreeNode *node)
         int childCount = countChildren(node->left);
         TreeNode *conditionNode = node->left;      // First child is the condition
         TreeNode *thenNode = conditionNode->right; // Next sibling is the 'then' part
-        if (childCount > 2)
-        {
-            // Handle the 'else' part if it exists
-            TreeNode *elseNode = thenNode->right; // Next sibling is the 'else' part
-        }
         SemanticType conditionType = analyzeExpression(conditionNode);
         if (conditionType != SemanticType::Boolean)
         {
             LOG_ERROR("Condition in 'if' statement must be of boolean type.");
             return;
         }
+        analyzeStatement(thenNode);
+        if (childCount > 2)
+        {
+            // Handle the 'else' part if it exists
+            TreeNode *elseNode = thenNode->right; // Next sibling is the 'else' part
+            analyzeStatement(elseNode);
+        }
         LOG_INFO("Finished analyzing if statement.");
+    }
+    else if(node->value == "while")
+    {
+        LOG_INFO("Analyzing while statement.");
+        TreeNode *conditionNode = node->left;      // First child is the condition
+        TreeNode *bodyNode = conditionNode->right; // Next sibling is the body of the while loop
+        SemanticType conditionType = analyzeExpression(conditionNode);
+        if (conditionType != SemanticType::Boolean)
+        {
+            LOG_ERROR("Condition in 'while' statement must be of boolean type.");
+            return;
+        }
+        analyzeStatement(bodyNode);
+        LOG_INFO("Finished analyzing while statement.");
+    }
+    else if (node->value == "repeat")
+    {
+        LOG_INFO("Analyzing repeat statement.");
+        int childCount = countChildren(node->left); // Count how many children the repeat statement has
+        TreeNode *temp = node->left;
+        while (temp->right != nullptr) {
+            temp = temp->right; // Move to the next sibling
+        }
+        TreeNode * untilNode = temp; // The last child is the 'until' condition
+        SemanticType untilType = analyzeExpression(untilNode);
+        if (untilType != SemanticType::Boolean)
+        {
+            LOG_ERROR("Condition in 'repeat' statement must be of boolean type.");
+            return;
+        }
+        TreeNode *bodyNode = node->left; // First child is the body of the repeat loop
+        for (int i = 0; i < childCount - 1; i++)
+        {
+            analyzeStatement(bodyNode);
+            bodyNode = bodyNode->right; // Move to the next sibling for the next iteration
+        }
+        LOG_INFO("Finished analyzing repeat statement.");
     }
     else if (node->value == "<null>")
     {
