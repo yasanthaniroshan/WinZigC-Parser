@@ -11,3 +11,6 @@
     iii. Same variable name can be declared in different scopes without conflict (shadowing)
 10. Condition in 'if' statement must be of boolean type
 11. Type mismatch in relational expression. Left operand has type 'X', but right operand has type 'Y'.
+12. Assumption of type members are not supported for +,-,*,/ operations eventhough they are ordered list of literals.
+13. Some Functions may not have return type, so we will allow the return type to be optional and default to 'void' (which we will represent as SymbolType::Unknown)
+14. Predeclared boolean literals 'true' and 'false' should be treated as constants of type boolean.

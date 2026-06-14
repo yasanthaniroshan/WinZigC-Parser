@@ -33,7 +33,9 @@ struct Symbol {
     std::string typeName; // For user-defined types, store the type name
     SymbolKind kind;
     SymbolType type;
+    
     int paramCount;         // only meaningful for functions
+    std::vector<SymbolType> paramTypes; // only meaningful for functions
 
     int ordinal = 0;
 

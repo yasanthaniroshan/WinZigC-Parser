@@ -2,6 +2,7 @@
 #define SEMANTIC_ANALYZER_H
 
 #include <iostream>
+#include <queue> 
 #include "common/result.h"
 #include "common/error.h"
 #include "utils/logger.h"
@@ -48,14 +49,24 @@ private:
 
     void analyzeStatement(TreeNode* node);
     void analyzeAssignment(TreeNode* node);
-
+    void analyzeForStatement(TreeNode* node);
+    
     void analyzeOutputStatement(TreeNode* node);
-
-
+    
+    
+    
+    
+    SemanticType analyzeReturnType(TreeNode* node);
     SemanticType analyzeExpression(TreeNode* node);
     SemanticType analyzeTerm(TreeNode* node);
     SemanticType analyzeFactor(TreeNode* node);
     SemanticType analyzePrimary(TreeNode* node);
+    SemanticType analyzeForExpression(TreeNode* node);
+
+
+    SemanticType analyzeCall(TreeNode* node);
+
+    SemanticType findReturnNodes(TreeNode *node);
 
 
     void analyzeAssign(TreeNode* node);
@@ -69,6 +80,7 @@ private:
             case SymbolType::Integer: return SemanticType::Integer;
             case SymbolType::Char: return SemanticType::Char;
             case SymbolType::String: return SemanticType::String;
+            case SymbolType::Boolean: return SemanticType::Boolean;
             case SymbolType::UserDefined: return SemanticType::UserDefined;
             default: return SemanticType::Unknown;
         }

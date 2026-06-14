@@ -3,6 +3,16 @@
 SymbolTable::SymbolTable() {
     // Start with a global scope
     scopes.emplace_back();
+
+    // Predeclare the built-in boolean literals so they resolve like constants.
+    Symbol falseSym("false", SymbolType::Boolean);
+    falseSym.kind = SymbolKind::Constant;
+    falseSym.ordinal = 0;
+    declare(falseSym);
+    Symbol trueSym("true", SymbolType::Boolean);
+    trueSym.kind = SymbolKind::Constant;
+    trueSym.ordinal = 1;
+    declare(trueSym);
 }
 
 void SymbolTable::enterScope() {
