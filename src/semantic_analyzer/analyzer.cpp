@@ -284,7 +284,12 @@ void SemanticAnalyzer::analyzeFcn(TreeNode *node)
         return;
     }
 
-    symbolTable.enterScope(); // Enter a new scope for the function
+    int functionScope = symbolTable.enterScope(); // Enter a new scope for the function
+    // Anchor the body scope onto the function symbol so later passes (code gen) can re-enter it.
+    if (Symbol *declared = symbolTable.lookup(funcSymbol.name))
+    {
+        declared->scopeIndex = functionScope;
+    }
     analyzeParams(paramsNode);
     analyzeConsts(constsNode);
     analyzeTypes(typesNode);
