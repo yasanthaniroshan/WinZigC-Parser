@@ -86,6 +86,17 @@ private:
         }
     }
 
+    static SymbolType getSymbolTypeFromSemanticType(SemanticType type) {
+        switch (type) {
+            case SemanticType::Integer: return SymbolType::Integer;
+            case SemanticType::Char: return SymbolType::Char;
+            case SemanticType::String: return SymbolType::String;
+            case SemanticType::Boolean: return SymbolType::Boolean;
+            case SemanticType::UserDefined: return SymbolType::UserDefined;
+            default: return SymbolType::UserDefined; // Default to UserDefined for unknown types
+        }
+    }
+
     // Helper functions for semantic analysis
 };
 #endif // SEMANTIC_ANALYZER_H
