@@ -14,3 +14,5 @@
 12. Assumption of type members are not supported for +,-,*,/ operations eventhough they are ordered list of literals.
 13. Some Functions may not have return type, so we will allow the return type to be optional and default to 'void' (which we will represent as SymbolType::Unknown)
 14. Predeclared boolean literals 'true' and 'false' should be treated as constants of type boolean.
+15. if there is a variable which is not already declared but assigned from a function call, we declare it with the return type of the function.
+16. Allowed +/- for the user defined ordered list of literals if the type members are all integers. Not allowed for boolean types.
