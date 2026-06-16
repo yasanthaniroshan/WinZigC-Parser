@@ -6,7 +6,7 @@
 #include <vector>
 
 enum class SymbolKind { Variable, Constant, Type, Function };
-enum class SymbolType { Integer, Char, String, UserDefined };
+enum class SymbolType { Integer, Char, String, Boolean, UserDefined };
 
 inline std::string symbolKindToString(SymbolKind kind) {
     switch (kind) {
@@ -22,6 +22,7 @@ inline std::string symbolTypeToString(SymbolType type) {
         case SymbolType::Integer: return "Integer";
         case SymbolType::Char: return "Char";
         case SymbolType::String: return "String";
+        case SymbolType::Boolean: return "Boolean";
         case SymbolType::UserDefined: return "UserDefined";
         default: return "Unknown";
     }
@@ -32,9 +33,14 @@ struct Symbol {
     std::string typeName; // For user-defined types, store the type name
     SymbolKind kind;
     SymbolType type;
+
     int paramCount;         // only meaningful for functions
+    std::vector<SymbolType> paramTypes; // only meaningful for functions
 
     int ordinal = 0;
+
+    int address;        // offset within its scope (0, 1, 2, ...)
+    int scopeIndex = -1; // for functions: index of the body scope (set during analysis)
 
     std::vector<std::string> members; // only meaningful for user-defined types
 
@@ -46,6 +52,7 @@ struct Symbol {
         if (type == "integer") return SymbolType::Integer;
         if (type == "char") return SymbolType::Char;
         if (type == "string") return SymbolType::String;
+        if (type == "boolean") return SymbolType::Boolean;
         return SymbolType::UserDefined;
     }
 
@@ -55,14 +62,22 @@ class SymbolTable {
 public:
     SymbolTable();
 
-    void enterScope();
-    void exitScope();
+    int enterScope();             // create and enter a new child of the current scope; returns its index
+    void reenterScope(int index); // re-enter an existing scope (for later passes, e.g. code generation)
+    void exitScope();             // return to the parent scope; scopes are never destroyed
+    int currentScopeIndex() const { return currentScope; }
     bool declare(const Symbol& sym);   // false if already declared in current scope
     Symbol* lookup(const std::string& name);  // walks up scopes, nullptr if not found
     void printCurrentScope(); // For debugging purposes
     void printAllScopes(); // For debugging purposes
 private:
-    std::vector<std::unordered_map<std::string, Symbol>> scopes;
+    struct Scope {
+        std::unordered_map<std::string, Symbol> symbols;
+        int addressCounter = 0;   // resets for each scope
+        int parent = -1;          // index of the enclosing scope (-1 for the global scope)
+    };
+    std::vector<Scope> scopes;
+    int currentScope = 0;         // index of the active scope (the global scope is 0)
 
 };
 

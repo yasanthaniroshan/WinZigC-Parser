@@ -1,52 +1,79 @@
 #include "semantic_analyzer/symbol.h"
 
 SymbolTable::SymbolTable() {
-    // Start with a global scope
+    // Start with a global scope (index 0, no parent).
     scopes.emplace_back();
+    currentScope = 0;
+
+    // Predeclare the built-in boolean literals so they resolve like constants.
+    Symbol falseSym("false", SymbolType::Boolean);
+    falseSym.kind = SymbolKind::Constant;
+    falseSym.ordinal = 0;
+    declare(falseSym);
+    Symbol trueSym("true", SymbolType::Boolean);
+    trueSym.kind = SymbolKind::Constant;
+    trueSym.ordinal = 1;
+    declare(trueSym);
 }
 
-void SymbolTable::enterScope() {
+int SymbolTable::enterScope() {
+    int parent = currentScope;
     scopes.emplace_back();
+    int index = static_cast<int>(scopes.size()) - 1;
+    scopes[index].parent = parent;
+    currentScope = index;
+    return index;
+}
+
+void SymbolTable::reenterScope(int index) {
+    if (index >= 0 && index < static_cast<int>(scopes.size())) {
+        currentScope = index;
+    }
 }
 
 void SymbolTable::exitScope() {
-    if (!scopes.empty()) {
-        scopes.pop_back();
+    // Scopes are never destroyed; just move back to the enclosing scope.
+    if (currentScope >= 0 && scopes[currentScope].parent >= 0) {
+        currentScope = scopes[currentScope].parent;
     }
 }
 
 bool SymbolTable::declare(const Symbol& sym) {
-    if (scopes.empty()) {
-        return false; // No scope to declare in
+    if (scopes.empty() || currentScope < 0) return false; // No scope to declare in
+
+    auto& scope = scopes[currentScope];
+    if (scope.symbols.count(sym.name)) return false; // Already declared in current scope
+    Symbol s = sym;
+    if (s.kind == SymbolKind::Variable) {
+        s.address = scope.addressCounter++;
+    } else {
+        s.address = -1;
     }
-    auto& currentScope = scopes.back();
-    if (currentScope.find(sym.name) != currentScope.end()) {
-        return false; // Symbol already declared in current scope
-    }
-    currentScope[sym.name] = sym;
+    scope.symbols[sym.name] = s;
     return true;
 }
 
 Symbol* SymbolTable::lookup(const std::string& name) {
-    for (auto it = scopes.rbegin(); it != scopes.rend(); ++it) {
-        auto found = it->find(name);
-        if (found != it->end()) {
+    // Walk from the current scope up the chain of parents.
+    for (int index = currentScope; index >= 0; index = scopes[index].parent) {
+        auto found = scopes[index].symbols.find(name);
+        if (found != scopes[index].symbols.end()) {
             return &found->second;
         }
     }
-    return nullptr; // Not found in any scope
+    return nullptr; // Not found in any enclosing scope
 }
 
 void SymbolTable::printCurrentScope() {
-    if (scopes.empty()) {
+    if (scopes.empty() || currentScope < 0) {
         std::cout << "No scopes available." << std::endl;
         return;
     }
-    const auto& currentScope = scopes.back();
+    const auto& scope = scopes[currentScope];
     std::cout << "Current Scope:" << std::endl;
-    for (const auto& pair : currentScope) {
+    for (const auto& pair : scope.symbols) {
         const Symbol& sym = pair.second;
-        std::cout << "  Name: " << sym.name << ", Kind: " << static_cast<int>(sym.kind) 
+        std::cout << "  Name: " << sym.name << ", Kind: " << static_cast<int>(sym.kind)
                   << ", Type: " << static_cast<int>(sym.type);
         if (sym.kind == SymbolKind::Type && !sym.members.empty()) {
             std::cout << ", Members: [";
@@ -61,10 +88,10 @@ void SymbolTable::printCurrentScope() {
 
 void SymbolTable::printAllScopes() {
     for (size_t i = 0; i < scopes.size(); ++i) {
-        std::cout << "Scope " << i << ":" << std::endl;
-        for (const auto& pair : scopes[i]) {
+        std::cout << "Scope " << i << " (parent " << scopes[i].parent << "):" << std::endl;
+        for (const auto& pair : scopes[i].symbols) {
             const Symbol& sym = pair.second;
-            std::cout << "  Name: " << sym.name << ", Kind: " << static_cast<int>(sym.kind) 
+            std::cout << "  Name: " << sym.name << ", Kind: " << static_cast<int>(sym.kind)
                       << ", Type: " << static_cast<int>(sym.type);
             if (sym.kind == SymbolKind::Type && !sym.members.empty()) {
                 std::cout << ", Members: [";
@@ -75,6 +102,12 @@ void SymbolTable::printAllScopes() {
             }
             if (sym.kind == SymbolKind::Constant){
                 std::cout << ", Ordinal: " << sym.ordinal;
+            }
+            if (sym.kind == SymbolKind::Variable){
+                std::cout << ", Address: " << sym.address;
+            }
+            if (sym.kind == SymbolKind::Function){
+                std::cout << ", BodyScope: " << sym.scopeIndex;
             }
             std::cout << std::endl;
         }

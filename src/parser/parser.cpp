@@ -915,7 +915,7 @@ void Parser::primary() {
         case TokensType::Plus: {
             advance(); // consume the plus keyword
             primary(); // parse the primary
-            buildTree("+", 1);
+            // buildTree("+", 1);
             break;
         }
         // Parsing Primary -> 'not' Primary
