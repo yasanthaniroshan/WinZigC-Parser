@@ -74,6 +74,9 @@ private:
     Result<CodeResult> generateIfStatement(TreeNode* node, CodeInput input);
     Result<CodeResult> generateWhileStatement(TreeNode* node, CodeInput input);
     Result<CodeResult> generateReadStatement(TreeNode* node, CodeInput input);
+    Result<CodeResult> generateRepeatStatement(TreeNode* node, CodeInput input);
+    Result<CodeResult> generateForStatement(TreeNode* node, CodeInput input);
+    Result<CodeResult> generateCaseStatement(TreeNode* node, CodeInput input);
 
     // helper functions for code generation
     void emit (const std::string& instr);
