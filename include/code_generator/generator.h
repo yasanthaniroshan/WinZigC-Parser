@@ -70,6 +70,10 @@ private:
     Result<CodeResult> generateOutputStatement(TreeNode* node, CodeInput input = CodeInput(0, 0));
 
     Result<CodeResult> generateString(TreeNode* node, CodeInput input);
+    // helper functions for code generation
+    void emit (const std::string& instr);
+    void emit (const std::string& instr, int operand);
+    void emit (const std::string& intr, const std::string& operand);
 };
 
 #endif // CODE_GENERATOR_H

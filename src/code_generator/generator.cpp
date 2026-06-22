@@ -9,6 +9,19 @@ CodeGenerator::~CodeGenerator()
     // The destructor does not need to delete `ast` because it is owned by the caller.
 }
 
+// Overloaded helper functions for generating the instructions
+void CodeGenerator::emit(const std::string& instr) {
+    generatedCode.push_back(instr);
+}
+
+void CodeGenerator::emit(const std::string& instr, int operand) {
+    generatedCode.push_back(instr + " " + std::to_string(operand));
+}
+
+void CodeGenerator::emit(const std::string& instr, const std::string& operand) {
+    generatedCode.push_back(instr + " " + operand);
+}
+
 Result<void> CodeGenerator::generate()
 {
     LOG_INFO("Starting code generation.");
