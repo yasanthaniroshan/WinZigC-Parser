@@ -133,6 +133,8 @@ Result<CodeResult> CodeGenerator::generateStatement(TreeNode *node, CodeInput in
         return generateIfStatement(node, input);
     } else if (node->value == "while") {
         return generateWhileStatement(node, input);
+    } else if (node->value == "read") {
+        return generateReadStatement(node, input);
     }
 
     LOG_ERROR("Unsupported statement node type: " + node->value);
@@ -434,6 +436,44 @@ Result<CodeResult> CodeGenerator::generateWhileStatement(TreeNode *node, CodeInp
 
     // 5. Patch the iffalse which jumps HERE - immediately after the goto
     generatedCode[ifFalsePatchIndex] = "iffalse " + std::to_string(currentRes.nextInstruction);
+
+    return Result<CodeResult>::Ok(currentRes);
+}
+
+/**
+ * Statement -> 'read' '(' Name list ',' ')'
+ * For a list of reads we need to take input from user for each identifier and
+ * store its value mapped to the corresponding identifier.
+ * 
+ * Parser builds subtree such that parent is 'read' and children are identifiers 
+ * in the list.
+ */
+Result<CodeResult> CodeGenerator::generateReadStatement(TreeNode* node, CodeInput input) {
+    LOG_INFO("Generating read statement.");
+    TreeNode* current = node->left; // first identifer
+    CodeResult currentRes = CodeResult(input.stackPointer, input.nextInstruction);
+
+    // iterate across sibling identifier (if any)
+    while (current != nullptr) {
+        // Emit read instruction (pushes user input to the stack)
+        emit("read");
+        currentRes.stackPointer++;
+        currentRes.nextInstruction++;
+
+        // Lookup variable and save inputted value
+        std::string varName = current->left->value;
+        Symbol *sym = symbolTable.lookup(varName);
+
+        if (sym == nullptr || sym->kind != SymbolKind::Variable) {
+            return Result<CodeResult>::Err(CodeGeneratorError("Invalid variable for read: " + varName));
+        }
+        // save the value to the variable
+        emit("save", sym->address);
+        currentRes.stackPointer--;
+        currentRes.nextInstruction++;
+
+        current = current->right; // move to the next identifier sibling
+    }
 
     return Result<CodeResult>::Ok(currentRes);
 }

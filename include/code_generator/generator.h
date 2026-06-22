@@ -73,6 +73,7 @@ private:
     Result<CodeResult> generateSwap(TreeNode* node, CodeInput input);
     Result<CodeResult> generateIfStatement(TreeNode* node, CodeInput input);
     Result<CodeResult> generateWhileStatement(TreeNode* node, CodeInput input);
+    Result<CodeResult> generateReadStatement(TreeNode* node, CodeInput input);
 
     // helper functions for code generation
     void emit (const std::string& instr);
