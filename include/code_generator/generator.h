@@ -68,8 +68,12 @@ private:
     Result<CodeResult> generateStatement(TreeNode* node, CodeInput input = CodeInput(0, 0));
     Result<CodeResult> generateExpression(TreeNode* node, CodeInput input = CodeInput(0, 0)); // Assuming this will be implemented to handle expressions
     Result<CodeResult> generateOutputStatement(TreeNode* node, CodeInput input = CodeInput(0, 0));
-
     Result<CodeResult> generateString(TreeNode* node, CodeInput input);
+    Result<CodeResult> generateAssignment(TreeNode* node, CodeInput input);
+    Result<CodeResult> generateSwap(TreeNode* node, CodeInput input);
+    Result<CodeResult> generateIfStatement(TreeNode* node, CodeInput input);
+    Result<CodeResult> generateWhileStatement(TreeNode* node, CodeInput input);
+
     // helper functions for code generation
     void emit (const std::string& instr);
     void emit (const std::string& instr, int operand);
