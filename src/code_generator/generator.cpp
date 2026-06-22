@@ -141,6 +141,10 @@ Result<CodeResult> CodeGenerator::generateStatement(TreeNode *node, CodeInput in
         return generateForStatement(node, input);
     } else if (node->value == "case") {
         return generateCaseStatement(node, input);
+    } else if (node->value == "loop") {
+        return generateLoopStatement(node, input);
+    } else if (node->value == "exit") {
+        return generateExitStatement(node, input);
     }
 
     LOG_ERROR("Unsupported statement node type: " + node->value);
@@ -756,6 +760,72 @@ Result<CodeResult> CodeGenerator::generateCaseStatement(TreeNode* node, CodeInpu
     // FINALLY we patch all the end jumps from the Statement bodies to end up here
     for (int jumpIndex : endJumps) {
         generatedCode[jumpIndex] = "goto " + std::to_string(currentRes.nextInstruction);
+    }
+
+    return Result<CodeResult>::Ok(currentRes);
+}
+
+/**
+ * Checks whether we're in a loop, if so outputs a single placeholder
+ * 'goto' instruction and register's its index in `generatedCode` in order
+ * to patch it later - we don't know where the end of the loop is yet.
+ */
+Result<CodeResult> CodeGenerator::generateExitStatement(TreeNode* node, CodeInput input) {
+    LOG_INFO("Generating exit statement");
+
+    // rain-check: are we inside a loop?
+    if (exitPatchStack.empty()) {
+        LOG_ERROR("Encountered 'exit' outside of a loop.");
+        return Result<CodeResult>::Err(CodeGeneratorError("Exit statement used outside of loop"));
+    }
+
+    // emit placeholder jump
+    int exitJumpIndex = input.nextInstruction;
+    emit("goto -1"); // we don't know where the end of the loop is yet
+    input.nextInstruction++;
+
+    // register jump to be patched in the future
+    exitPatchStack.back().push_back(exitJumpIndex);
+
+    return Result<CodeResult>::Ok(CodeResult(input.stackPointer, input.nextInstruction));
+}
+
+/**
+ * Generate instructions for loop statements. 
+ * Also handles exiting via 'exit' statements and tracking loop nesting using 
+ * CodeGenerator::exitPatchStack
+ */
+Result<CodeResult> CodeGenerator::generateLoopStatement(TreeNode* node, CodeInput input) {
+    LOG_INFO("Generating loop..pool statement");
+
+    // Add this loop to the back of the exit-tracking vector. Any 'exit's that 
+    // take control-flow out of this specific loop will therefore be added as 
+    // members of the std::vector<int>() array initialized below.
+    exitPatchStack.push_back(std::vector<int>());
+
+    int loopStartIndex = input.nextInstruction; // mark top of loop
+    CodeResult currentRes = CodeResult(input.stackPointer, input.nextInstruction);
+
+    // Generate code for the loop-body statements
+    TreeNode *currentStmt = node->left;
+    while (currentStmt != nullptr) {
+        auto stmtRes = generateStatement(currentStmt, CodeInput(currentRes.stackPointer, currentRes.nextInstruction));
+        if (!stmtRes.success) return stmtRes;
+        currentRes = stmtRes.value.value();
+
+        currentStmt = currentStmt->right;
+    }
+
+    // unconditionally jump back to the top
+    emit("goto", loopStartIndex);
+    currentRes.nextInstruction++;
+
+    // retrieve all the 'exit' statements that came up inside the statement blocks
+    std::vector<int> exits = exitPatchStack.back();
+    exitPatchStack.pop_back();
+
+    for (int patchIndex : exits) {
+        generatedCode[patchIndex] = "goto " + std::to_string(currentRes.nextInstruction);
     }
 
     return Result<CodeResult>::Ok(currentRes);

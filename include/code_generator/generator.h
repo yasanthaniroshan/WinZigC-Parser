@@ -59,6 +59,7 @@ private:
     SymbolTable symbolTable; // The symbol table for code generation.
     std::string outputFile; // The output file for the generated code
     std::vector<std::string> generatedCode; // Store generated code lines
+    std::vector<std::vector<int>> exitPatchStack; // for tracking nested loops for loop..pool-exit 
     Result<CodeResult> generateProgram(TreeNode* node, CodeInput input = CodeInput(0, 0));
     Result<CodeResult> generateConsts(TreeNode* node, CodeInput input = CodeInput(0, 0));
     Result<CodeResult> generateTypes(TreeNode* node, CodeInput input = CodeInput(0, 0));
@@ -77,6 +78,8 @@ private:
     Result<CodeResult> generateRepeatStatement(TreeNode* node, CodeInput input);
     Result<CodeResult> generateForStatement(TreeNode* node, CodeInput input);
     Result<CodeResult> generateCaseStatement(TreeNode* node, CodeInput input);
+    Result<CodeResult> generateLoopStatement(TreeNode* node, CodeInput input);
+    Result<CodeResult> generateExitStatement(TreeNode* node, CodeInput input);
 
     // helper functions for code generation
     void emit (const std::string& instr);
