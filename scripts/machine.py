@@ -15,6 +15,20 @@ class Op(enum.Enum):
     IFFALSE = "iffalse"
     IFTRUE = "iftrue"
     STOP = "stop"
+    # Added
+    MULTIPLY = "multiply"
+    DIVIDE = "divide"
+    MOD = "mod"
+    AND = "and"
+    OR = "or"
+    LESSTHAN = "lessthan"
+    GREATER = "greater"
+    GREATEREQUAL = "greaterequal"
+    NOTEQUAL = "notequal"
+    CALL = "call"
+    RETURN = "return"
+    LITS = "lits"
+    PRINTS = "prints"
 
     
 
@@ -22,6 +36,7 @@ class StackMachine:
     def __init__(self, code, stack_size=1000):
         self.code = code
         self.stack = [0] * stack_size
+        self.call_stack = [] # for tracking function calls
         self.top = -1
         self.pc = 0 
         self.input_ptr = 0
@@ -40,6 +55,9 @@ class StackMachine:
         return int(data)
 
     def print_integer(self):
+        print(self.pop())
+    
+    def print_string(self):
         print(self.pop())
 
     def run(self):
@@ -106,12 +124,72 @@ class StackMachine:
                 elif op == Op.STOP:
                     break
 
+                elif op == Op.MULTIPLY:
+                    t = self.pop()
+                    self.stack[self.top] *= t
+                
+                elif op == Op.DIVIDE:
+                    t = self.pop()
+                    if t == 0:
+                        raise ZeroDivisionError
+                    self.stack[self.top] /= t
+                
+                elif op == Op.MOD:
+                    t = self.pop()
+                    self.stack[self.top] %= t 
+                
+                elif op == Op.AND:
+                    t = self.pop()
+                    self.stack[self.top] = self.stack[self.top] and t
+                
+                elif op == Op.OR:
+                    t = self.pop()
+                    self.stack[self.top] = self.stack[self.top] or t
+                
+                elif op == Op.LESSTHAN:
+                    t = self.pop()
+                    self.stack[self.top] = 1 if self.stack[self.top] < t else 0
+               
+                elif op == Op.GREATER:
+                    t = self.pop()
+                    self.stack[self.top] = 1 if self.stack[self.top] > t else 0
+
+                elif op == Op.GREATEREQUAL:
+                    t = self.pop()
+                    self.stack[self.top] = 1 if self.stack[self.top] >= t else 0
+
+                elif op == Op.NOTEQUAL:
+                    t = self.pop()
+                    self.stack[self.top] = 1 if self.stack[self.top] != t else 0
+                
+                elif op == Op.CALL:
+                    n = instr[1] # second element is the instruction address of funciton
+                    self.call_stack.append(self.pc + 1) # self.pc is the CALL instruction - return to immediately after it
+                    self.pc = n - 1 
+                    continue # don't increment PC
+                
+                elif op == Op.RETURN:
+                    if not self.call_stack:
+                        raise RuntimeError("Return called with empty call stack")
+                    self.pc = self.call_stack.pop()
+                    continue # do not increment
+
+                elif op == Op.LITS:
+                    s = instr[n]
+                    self.push(s)
+
+                elif op == Op.PRINTS:
+                    self.print_string()
+
                 self.pc += 1
             except IndexError:
                 raise RuntimeError("Program counter out of bounds")
             
             except ValueError:
                 raise RuntimeError("Invalid instruction: {}".format(instr))
+            
+            except ZeroDivisionError:
+                raise ZeroDivisionError("Zero division")
 
 
 
