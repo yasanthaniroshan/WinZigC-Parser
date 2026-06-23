@@ -25,7 +25,7 @@ void CodeGenerator::emit(const std::string& instr, const std::string& operand) {
 //===== Code generation =====
 Result<void> CodeGenerator::generate()
 {
-    LOG_INFO("Starting code generation.");
+    LOG_DEBUG("Starting code generation.");
     generateProgram(ast, CodeInput(0, 1));
     printGeneratedCode();
     saveGeneratedCode();
@@ -50,7 +50,7 @@ Result<CodeResult> CodeGenerator::generateProgram(TreeNode *node, CodeInput inpu
     Result<CodeResult> typesCode = generateTypes(types, input);
     Result<CodeResult> dclnsCode = generateDclns(dclns, input); // Does nothing -- see function docstring
     
-    LOG_INFO("Stack Pointer and Next Instruction after consts, types and dclns generation: " + std::to_string(input.stackPointer) + ", " + std::to_string(input.nextInstruction));
+    LOG_DEBUG("Stack Pointer and Next Instruction after consts, types and dclns generation: " + std::to_string(input.stackPointer) + ", " + std::to_string(input.nextInstruction));
     CodeResult currentRes = CodeResult(input.stackPointer, input.nextInstruction);
 
     // Before generating functions we need an unconditional jump - otherwise program
@@ -100,7 +100,7 @@ Result<CodeResult> CodeGenerator::generateTypes(TreeNode *node, CodeInput input)
  */
 Result<CodeResult> CodeGenerator::generateDclns(TreeNode *node, CodeInput input)
 {
-    LOG_INFO("generateDclns called - but Variable declaration implicitly handled by SymbolTable");
+    LOG_DEBUG("generateDclns called - but Variable declaration implicitly handled by SymbolTable");
 
     // therefore simply exiting
     return Result<CodeResult>::Ok(CodeResult(input.stackPointer, input.nextInstruction));
@@ -111,7 +111,7 @@ Result<CodeResult> CodeGenerator::generateDclns(TreeNode *node, CodeInput input)
  */
 Result<CodeResult> CodeGenerator::generateSubprogs(TreeNode *node, CodeInput input)
 {
-    LOG_INFO("Generating subprogs");
+    LOG_DEBUG("Generating subprogs");
     CodeResult currentRes = CodeResult(input.stackPointer, input.nextInstruction);
     
     if (node == nullptr || node->value != "subprogs") return Result<CodeResult>::Ok(currentRes);
@@ -135,7 +135,7 @@ Result<CodeResult> CodeGenerator::generateSubprogs(TreeNode *node, CodeInput inp
  */
 Result<CodeResult> CodeGenerator::generateFcn(TreeNode *node, CodeInput input)
 {
-    LOG_INFO("Generating Fcn code.");
+    LOG_DEBUG("Generating Fcn code.");
     CodeResult currentRes = CodeResult(input.stackPointer, input.nextInstruction);
 
     TreeNode *nameNode = node->left;
@@ -217,7 +217,7 @@ Result<CodeResult> CodeGenerator::generateFcn(TreeNode *node, CodeInput input)
  * Evaluate expression, assuming expression will leave result on top of stack.
  */
 Result<CodeResult> CodeGenerator::generateReturnStatement(TreeNode *node, CodeInput input) {
-    LOG_INFO("Generating return statement");
+    LOG_DEBUG("Generating return statement");
 
     // evaluate return expression
     auto exprRes = generateExpression(node->left, input);
@@ -235,7 +235,7 @@ Result<CodeResult> CodeGenerator::generateReturnStatement(TreeNode *node, CodeIn
  */
 Result<CodeResult> CodeGenerator::generateBody(TreeNode *node, CodeInput input)
 {
-    LOG_INFO("Generating code for program body with node value: " + node->value);
+    LOG_DEBUG("Generating code for program body with node value: " + node->value);
     TreeNode *current = node->left; // First child is the first statement
     CodeInput currentInput = input;
     CodeResult lastResult(input.stackPointer, input.nextInstruction); // Create CodeResult struct with previous generation functions outputs
@@ -305,7 +305,7 @@ Result<CodeResult> CodeGenerator::generateStatement(TreeNode *node, CodeInput in
  */
 Result<CodeResult> CodeGenerator::generateOutputStatement(TreeNode *node, CodeInput input)
 {
-    LOG_INFO("Generating output statement.");
+    LOG_DEBUG("Generating output statement.");
     TreeNode *current = node->left; // First child wrapped in 'string' or 'integer'
     CodeResult currentRes = CodeResult(input.stackPointer, input.nextInstruction);
 
@@ -341,7 +341,7 @@ Result<CodeResult> CodeGenerator::generateOutputStatement(TreeNode *node, CodeIn
  */
 Result<CodeResult> CodeGenerator::generateString(TreeNode *node, CodeInput input)
 {
-    LOG_INFO("Generating code for string");
+    LOG_DEBUG("Generating code for string");
     TreeNode *stringLiteralNode = node->left;
     std::string stringValue = stringLiteralNode->left->value;
 
@@ -366,7 +366,7 @@ Result<CodeResult> CodeGenerator::generateExpression(TreeNode *node, CodeInput i
     // here we go. 
 
     CodeInput currentInput = input;
-    LOG_INFO("Generating expression for node: " + node->value);
+    LOG_DEBUG("Generating expression for node: " + node->value);
     
     // === 1. Base case - leaves
     if (node->value == "<integer>") {
@@ -507,7 +507,7 @@ Result<CodeResult> CodeGenerator::generateExpression(TreeNode *node, CodeInput i
  * and emits `save <addr>` instruction for assigned variable
  */
 Result<CodeResult> CodeGenerator::generateAssignment(TreeNode *node, CodeInput input) {
-    LOG_INFO("Generating code for assignment with node value: " + node->value);
+    LOG_DEBUG("Generating code for assignment with node value: " + node->value);
     TreeNode *identNode = node->left; // first child of assign is always an identifier (Name)
     TreeNode *exprNode = identNode->right; // sibling of identifier is an expression
 
@@ -540,7 +540,7 @@ Result<CodeResult> CodeGenerator::generateAssignment(TreeNode *node, CodeInput i
  * Emits four instructions leaves stackPointer unchanged
  */
 Result<CodeResult> CodeGenerator::generateSwap(TreeNode* node, CodeInput input) {
-    LOG_INFO("Generating code for swap with node value: " + node->value);
+    LOG_DEBUG("Generating code for swap with node value: " + node->value);
     TreeNode *identNode1 = node->left;
     TreeNode *identNode2 = identNode1->right;
 
@@ -573,7 +573,7 @@ Result<CodeResult> CodeGenerator::generateSwap(TreeNode* node, CodeInput input) 
  * 
  */
 Result<CodeResult> CodeGenerator::generateIfStatement(TreeNode *node, CodeInput input) {
-    LOG_INFO("Generating if-then-else statement");
+    LOG_DEBUG("Generating if-then-else statement");
     TreeNode *conditionNode = node->left;
     TreeNode *thenNode = conditionNode->right;
     TreeNode *elseNode = thenNode->right; // will be nullptr if not existing
@@ -630,7 +630,7 @@ Result<CodeResult> CodeGenerator::generateIfStatement(TreeNode *node, CodeInput 
  * 
  */
 Result<CodeResult> CodeGenerator::generateWhileStatement(TreeNode *node, CodeInput input) {
-    LOG_INFO("Generating while statement");
+    LOG_DEBUG("Generating while statement");
     TreeNode* conditionNode = node->left;
     TreeNode* doNode = conditionNode->right;
 
@@ -685,7 +685,7 @@ Result<CodeResult> CodeGenerator::generateWhileStatement(TreeNode *node, CodeInp
  * in the list.
  */
 Result<CodeResult> CodeGenerator::generateReadStatement(TreeNode* node, CodeInput input) {
-    LOG_INFO("Generating read statement.");
+    LOG_DEBUG("Generating read statement.");
     TreeNode* current = node->left; // first identifer
     CodeResult currentRes = CodeResult(input.stackPointer, input.nextInstruction);
 
@@ -726,7 +726,7 @@ Result<CodeResult> CodeGenerator::generateReadStatement(TreeNode* node, CodeInpu
  * 
  */
 Result<CodeResult> CodeGenerator::generateRepeatStatement(TreeNode* node, CodeInput input) {
-    LOG_INFO("Generating code for the repeat until statement");
+    LOG_DEBUG("Generating code for the repeat until statement");
 
     TreeNode* current = node->left;
     // mark the start of the loop
@@ -776,7 +776,7 @@ Result<CodeResult> CodeGenerator::generateRepeatStatement(TreeNode* node, CodeIn
  * 
  */
 Result<CodeResult> CodeGenerator::generateForStatement(TreeNode* node, CodeInput input) {
-    LOG_INFO("Generating code for a for-statement.");
+    LOG_DEBUG("Generating code for a for-statement.");
     TreeNode *initNode = node->left;
     TreeNode *condNode = initNode->right;
     TreeNode *updateNode = condNode->right;
@@ -872,7 +872,7 @@ Result<CodeResult> CodeGenerator::generateForStatement(TreeNode* node, CodeInput
  * 
  */
 Result<CodeResult> CodeGenerator::generateCaseStatement(TreeNode* node, CodeInput input) {
-    LOG_INFO("Generating code for a case-statement.");
+    LOG_DEBUG("Generating code for a case-statement.");
 
     TreeNode *caseExprNode = node->left;
     TreeNode *currentClause = caseExprNode->right;
@@ -1017,7 +1017,7 @@ Result<CodeResult> CodeGenerator::generateCaseStatement(TreeNode* node, CodeInpu
  * to patch it later - we don't know where the end of the loop is yet.
  */
 Result<CodeResult> CodeGenerator::generateExitStatement(TreeNode* node, CodeInput input) {
-    LOG_INFO("Generating exit statement");
+    LOG_DEBUG("Generating exit statement");
 
     // rain-check: are we inside a loop?
     if (exitPatchStack.empty()) {
@@ -1042,7 +1042,7 @@ Result<CodeResult> CodeGenerator::generateExitStatement(TreeNode* node, CodeInpu
  * CodeGenerator::exitPatchStack
  */
 Result<CodeResult> CodeGenerator::generateLoopStatement(TreeNode* node, CodeInput input) {
-    LOG_INFO("Generating loop..pool statement");
+    LOG_DEBUG("Generating loop..pool statement");
 
     // Add this loop to the back of the exit-tracking vector. Any 'exit's that 
     // take control-flow out of this specific loop will therefore be added as 
