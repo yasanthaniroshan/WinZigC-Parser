@@ -291,36 +291,59 @@ Result<CodeResult> CodeGenerator::generateStatement(TreeNode *node, CodeInput in
     return Result<CodeResult>::Err(CodeGeneratorError("Unsupported statement node type: " + node->value));
 }
 
+/**
+ * Generate output statement
+ */
 Result<CodeResult> CodeGenerator::generateOutputStatement(TreeNode *node, CodeInput input)
 {
-    // TODO: implement output statement code generation
-    TreeNode *current = node->left; // First child is the expression to output
-    LOG_INFO("Generating code for output statement with node value: " + current->value);
-    Result<CodeResult> stringResult;
-    if (current->value == "string")
-    {
-        stringResult = generateString(current, input);
-    }
-    else
-    {
-        stringResult = generateExpression(current, input); // Assuming generateExpression is implemented to handle other types of expressions
-    }
-    CodeResult result;
-    result.stackPointer = stringResult.value->stackPointer + 1;       // Example of modifying the stack pointer for the output statement
-    result.nextInstruction = stringResult.value->nextInstruction + 1; // Example of modifying the next instruction
-    generatedCode.push_back("print");                                 // Example of adding a line of code to the generated code
-    return Result<CodeResult>::Ok(result);
+    LOG_INFO("Generating output statement.");
+    TreeNode *current = node->left; // First child wrapped in 'string' or 'integer'
+    CodeResult currentRes = CodeResult(input.stackPointer, input.nextInstruction);
+
+    // loop through comma separated expressions in output statement
+    while (current != nullptr) {
+        if (current->value == "string") {
+            auto strRes = generateString(current, CodeInput(currentRes.stackPointer, currentRes.nextInstruction));
+            if (!strRes.success) return strRes; // generateString creates the error
+            currentRes = strRes.value.value();
+
+            // emit custom prints instruction
+            emit("prints");
+            currentRes.stackPointer--;
+            currentRes.nextInstruction++;
+        } else if (current->value == "integer") {
+            // actual expression is left child of 'integer' wrapper node
+            auto exprRes = generateExpression(current->left, CodeInput(currentRes.nextInstruction, currentRes.stackPointer));
+            if (!exprRes.success) return exprRes;
+            currentRes = exprRes.value.value();
+
+            // emit standard integer-print instruction
+            emit("print");
+            currentRes.stackPointer--;
+            currentRes.nextInstruction++;
+        }
+        current = current->right;
+    }                            
+    return Result<CodeResult>::Ok(currentRes);
 }
 
+/**
+ * Generate string for printing
+ */
 Result<CodeResult> CodeGenerator::generateString(TreeNode *node, CodeInput input)
 {
-    TreeNode *stringLiteralNode = node->left;                 // First child is the string literal
-    std::string stringValue = stringLiteralNode->left->value; // Get the string value
-    CodeResult result;
-    result.stackPointer = input.stackPointer + 1;            // Example of modifying the stack pointer for the string literal
-    result.nextInstruction = input.nextInstruction + 1;      // Example of modifying the next instruction
-    generatedCode.push_back("lits \"" + stringValue + "\""); // Example of adding a line of code to load the string literal
-    return Result<CodeResult>::Ok(result);
+    LOG_INFO("Generating code for string");
+    TreeNode *stringLiteralNode = node->left;
+    std::string stringValue = stringLiteralNode->left->value;
+
+    CodeResult currentRes = CodeResult(input.stackPointer, input.nextInstruction);
+
+    emit("lits", stringValue);
+
+    currentRes.stackPointer++; // pushes literal on to the stack
+    currentRes.nextInstruction++;
+
+    return Result<CodeResult>::Ok(currentRes);
 }
 
 /**
