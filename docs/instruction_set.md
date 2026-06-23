@@ -33,6 +33,11 @@ case Code[PC] of
     greaterthan:    t := stack[top--]; stack[top] := stack[top] > t;
     greaterequal:   t := stack[top--]; stack[top] := stack[top] >= t;
     notequal:       t := stack[top--]; stack[top] := stack[top] != t;
+    call:           // push current PC to internal Call Stack set PC := n; goto Next;
+    return:         // pop top address from internal Call Stack, set PC := address; goto Next
+    lits:           stack[++top] := string
+    prints:         putstring(stack[top--])
+
 end;
 ++PC;
 goto Next;
