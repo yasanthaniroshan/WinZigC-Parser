@@ -22,6 +22,7 @@ class Op(enum.Enum):
     AND = "and"
     OR = "or"
     LESSTHAN = "lessthan"
+    LESSEQUAL = "lessequal"
     GREATER = "greater"
     GREATEREQUAL = "greaterequal"
     NOTEQUAL = "notequal"
@@ -70,29 +71,29 @@ class StackMachine:
              
                 if op == Op.SAVE:
                     n = instr[1]
-                    self.stack[n] = self.pop()
+                    self.stack[int(n)] = self.pop()
 
                 elif op == Op.LOAD:
                     n = instr[1]
-                    self.push(self.stack[n])
+                    self.push(self.stack[int(n)])
 
                 elif op == Op.NEGATE:
-                    self.stack[self.top] = -self.stack[self.top]
+                    self.stack[self.top] = -int(self.stack[self.top])
 
                 elif op == Op.NOT:
-                    self.stack[self.top] = 0 if self.stack[self.top] else 1
+                    self.stack[self.top] = 0 if int(self.stack[self.top]) else 1
 
                 elif op == Op.ADD:
-                    t = self.pop()
-                    self.stack[self.top] += t
+                    t = int(self.pop())
+                    self.stack[self.top] = int(self.stack[self.top]) + t
 
                 elif op == Op.SUBTRACT:
-                    t = self.pop()
-                    self.stack[self.top] -= t
+                    t = int(self.pop())
+                    self.stack[self.top] = int(self.stack[self.top]) - t
 
                 elif op == Op.EQUAL:
-                    t = self.pop()
-                    self.stack[self.top] = 1 if self.stack[self.top] == t else 0
+                    t = int(self.pop())
+                    self.stack[self.top] = 1 if int(self.stack[self.top]) == t else 0
 
                 elif op == Op.READ:
                     self.push(self.read_integer())
@@ -106,66 +107,70 @@ class StackMachine:
 
                 elif op == Op.GOTO:
                     n = instr[1]
-                    self.pc = n - 1
+                    self.pc = int(n) - 1
                     continue
 
                 elif op == Op.IFFALSE:
                     n = instr[1]
                     if self.pop() == 0:
-                        self.pc = n - 1
+                        self.pc = int(n) - 1
                         continue
 
                 elif op == Op.IFTRUE:
                     n = instr[1]
                     if self.pop() == 1:
-                        self.pc = n - 1
+                        self.pc = int(n) - 1
                         continue
 
                 elif op == Op.STOP:
                     break
 
                 elif op == Op.MULTIPLY:
-                    t = self.pop()
-                    self.stack[self.top] *= t
+                    t = int(self.pop())
+                    self.stack[self.top] = int(self.stack[self.top]) * t
                 
                 elif op == Op.DIVIDE:
-                    t = self.pop()
+                    t = int(self.pop())
                     if t == 0:
                         raise ZeroDivisionError
-                    self.stack[self.top] /= t
+                    self.stack[self.top] = int(self.stack[self.top]) // t
                 
                 elif op == Op.MOD:
-                    t = self.pop()
-                    self.stack[self.top] %= t 
+                    t = int(self.pop())
+                    self.stack[self.top] = int(self.stack[self.top]) % t
                 
                 elif op == Op.AND:
-                    t = self.pop()
-                    self.stack[self.top] = self.stack[self.top] and t
+                    t = int(self.pop())
+                    self.stack[self.top] = int(self.stack[self.top]) and t
                 
                 elif op == Op.OR:
-                    t = self.pop()
-                    self.stack[self.top] = self.stack[self.top] or t
+                    t = int(self.pop())
+                    self.stack[self.top] = int(self.stack[self.top]) or t
                 
                 elif op == Op.LESSTHAN:
-                    t = self.pop()
-                    self.stack[self.top] = 1 if self.stack[self.top] < t else 0
-               
+                    t = int(self.pop())
+                    self.stack[self.top] = 1 if int(self.stack[self.top]) < t else 0
+
+                elif op == Op.LESSEQUAL:
+                    t = int(self.pop())
+                    self.stack[self.top] = 1 if int(self.stack[self.top]) <= t else 0
+
                 elif op == Op.GREATER:
-                    t = self.pop()
-                    self.stack[self.top] = 1 if self.stack[self.top] > t else 0
+                    t = int(self.pop())
+                    self.stack[self.top] = 1 if int(self.stack[self.top]) > t else 0
 
                 elif op == Op.GREATEREQUAL:
-                    t = self.pop()
-                    self.stack[self.top] = 1 if self.stack[self.top] >= t else 0
+                    t = int(self.pop())
+                    self.stack[self.top] = 1 if int(self.stack[self.top]) >= t else 0
 
                 elif op == Op.NOTEQUAL:
-                    t = self.pop()
-                    self.stack[self.top] = 1 if self.stack[self.top] != t else 0
+                    t = int(self.pop())
+                    self.stack[self.top] = 1 if int(self.stack[self.top]) != t else 0
                 
                 elif op == Op.CALL:
                     n = instr[1] # second element is the instruction address of funciton
                     self.call_stack.append(self.pc + 1) # self.pc is the CALL instruction - return to immediately after it
-                    self.pc = n - 1 
+                    self.pc = int(n) - 1 
                     continue # don't increment PC
                 
                 elif op == Op.RETURN:
@@ -175,7 +180,7 @@ class StackMachine:
                     continue # do not increment
 
                 elif op == Op.LITS:
-                    s = instr[n]
+                    s = instr[1]
                     self.push(s)
 
                 elif op == Op.PRINTS:
@@ -206,7 +211,8 @@ if __name__ == "__main__":
                 continue
             parts = line.split()
             op = parts[0]
-            args = tuple(int(x) for x in parts[1:]) if len(parts) > 1 else ()
-            program.append((op, *args))
+            # args = tuple(x for x in parts[1:]) if len(parts) > 1 else ()
+            args = " ".join(parts[1:]) if len(parts) > 1 else None
+            program.append((op, args))
     machine = StackMachine(program)
     machine.run()

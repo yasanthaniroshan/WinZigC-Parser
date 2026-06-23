@@ -26,7 +26,7 @@ void CodeGenerator::emit(const std::string& instr, const std::string& operand) {
 Result<void> CodeGenerator::generate()
 {
     LOG_INFO("Starting code generation.");
-    generateProgram(ast, CodeInput(0, 0));
+    generateProgram(ast, CodeInput(0, 1));
     printGeneratedCode();
     saveGeneratedCode();
     return Result<void>::Ok();
@@ -50,6 +50,7 @@ Result<CodeResult> CodeGenerator::generateProgram(TreeNode *node, CodeInput inpu
     Result<CodeResult> typesCode = generateTypes(types, input);
     Result<CodeResult> dclnsCode = generateDclns(dclns, input); // Does nothing -- see function docstring
     
+    LOG_INFO("Stack Pointer and Next Instruction after consts, types and dclns generation: " + std::to_string(input.stackPointer) + ", " + std::to_string(input.nextInstruction));
     CodeResult currentRes = CodeResult(input.stackPointer, input.nextInstruction);
 
     // Before generating functions we need an unconditional jump - otherwise program
@@ -64,7 +65,7 @@ Result<CodeResult> CodeGenerator::generateProgram(TreeNode *node, CodeInput inpu
     currentRes = subprogsCode.value.value();
 
     // Patch eariler goto to point HERE - start of the main body
-    generatedCode[mainJumpIndex] = "goto " + std::to_string(currentRes.nextInstruction);
+    generatedCode[mainJumpIndex - 1] = "goto " + std::to_string(currentRes.nextInstruction);
 
     // Generate Main program body
     Result<CodeResult> bodyCode = generateBody(body, CodeInput(currentRes.stackPointer, currentRes.nextInstruction));
@@ -313,7 +314,7 @@ Result<CodeResult> CodeGenerator::generateOutputStatement(TreeNode *node, CodeIn
             currentRes.nextInstruction++;
         } else if (current->value == "integer") {
             // actual expression is left child of 'integer' wrapper node
-            auto exprRes = generateExpression(current->left, CodeInput(currentRes.nextInstruction, currentRes.stackPointer));
+            auto exprRes = generateExpression(current->left, CodeInput(currentRes.stackPointer, currentRes.nextInstruction));
             if (!exprRes.success) return exprRes;
             currentRes = exprRes.value.value();
 
@@ -589,7 +590,7 @@ Result<CodeResult> CodeGenerator::generateIfStatement(TreeNode *node, CodeInput 
         currentRes.nextInstruction++;
 
         // 5. patch the iffalse jump. It should jump HERE (i.e. to the start of the else-block)
-        generatedCode[ifFalsePatchIndex] = "iffalse " + std::to_string(currentRes.nextInstruction);
+        generatedCode[ifFalsePatchIndex - 1] = "iffalse " + std::to_string(currentRes.nextInstruction);
 
         // 6. Generate the else-statement
         auto elseRes = generateStatement(elseNode, CodeInput(currentRes.stackPointer, currentRes.nextInstruction));
@@ -597,11 +598,11 @@ Result<CodeResult> CodeGenerator::generateIfStatement(TreeNode *node, CodeInput 
         currentRes = elseRes.value.value();
 
         // 7. patch the goto jump. It should jump HERE, immediately after the else block
-        generatedCode[gotoPatchIndex] = "goto " + std::to_string(currentRes.nextInstruction);
+        generatedCode[gotoPatchIndex - 1] = "goto " + std::to_string(currentRes.nextInstruction);
 
     } else {
         // no else-block - we just patch the iffalse to point HERE to the end of the then-block 
-        generatedCode[ifFalsePatchIndex] = "iffalse " + std::to_string(currentRes.nextInstruction);
+        generatedCode[ifFalsePatchIndex - 1] = "iffalse " + std::to_string(currentRes.nextInstruction);
     }
 
     return Result<CodeResult>::Ok(currentRes);
@@ -659,7 +660,7 @@ Result<CodeResult> CodeGenerator::generateWhileStatement(TreeNode *node, CodeInp
     // after the loop's `goto LOOP_START` instruction.
 
     // 5. Patch the iffalse which jumps HERE - immediately after the goto
-    generatedCode[ifFalsePatchIndex] = "iffalse " + std::to_string(currentRes.nextInstruction);
+    generatedCode[ifFalsePatchIndex - 1] = "iffalse " + std::to_string(currentRes.nextInstruction);
 
     return Result<CodeResult>::Ok(currentRes);
 }
@@ -745,7 +746,7 @@ Result<CodeResult> CodeGenerator::generateRepeatStatement(TreeNode* node, CodeIn
     std::vector<int> exitsToPatch = exitPatchStack.back();
     exitPatchStack.pop_back();
     for (int exitInstrIndex : exitsToPatch) {
-        generatedCode[exitInstrIndex] = "goto " + std::to_string(currentRes.nextInstruction);
+        generatedCode[exitInstrIndex - 1] = "goto " + std::to_string(currentRes.nextInstruction);
     }
 
     return Result<CodeResult>::Ok(currentRes);
@@ -813,11 +814,11 @@ Result<CodeResult> CodeGenerator::generateForStatement(TreeNode* node, CodeInput
     std::vector<int> exitsToPatch = exitPatchStack.back();
     exitPatchStack.pop_back();
     for (int exitInstrIndex : exitsToPatch) {
-        generatedCode[exitInstrIndex] = "goto " + std::to_string(currentRes.nextInstruction);
+        generatedCode[exitInstrIndex - 1] = "goto " + std::to_string(currentRes.nextInstruction);
     }
     
     // patch the iffalse to allow it to jump HERE - immediately after goto
-    generatedCode[ifFalsePatchIndex] = "iffalse " + std::to_string(currentRes.nextInstruction);
+    generatedCode[ifFalsePatchIndex - 1] = "iffalse " + std::to_string(currentRes.nextInstruction);
 
     return Result<CodeResult>::Ok(currentRes);
 }
@@ -968,7 +969,7 @@ Result<CodeResult> CodeGenerator::generateCaseStatement(TreeNode* node, CodeInpu
 
         // patch all the `iftrue` instructions that need to jump to this
         for (int jumpIndex : jumps) {
-            generatedCode[jumpIndex] = "iftrue " + std::to_string(currentRes.nextInstruction);
+            generatedCode[jumpIndex - 1] = "iftrue " + std::to_string(currentRes.nextInstruction);
         }
 
         // Generate the body Statement
@@ -983,7 +984,7 @@ Result<CodeResult> CodeGenerator::generateCaseStatement(TreeNode* node, CodeInpu
 
     // Generate the OTHERWISE block if it exists
     // The 'goto DEFAULT' jump above has to be patched to point HERE
-    generatedCode[defaultJumpIndex] = "goto " + std::to_string(currentRes.nextInstruction++);
+    generatedCode[defaultJumpIndex - 1] = "goto " + std::to_string(currentRes.nextInstruction++);
 
     if (otherwiseClause != nullptr) {
         auto otherwRes = generateStatement(otherwiseClause->left, CodeInput(currentRes.stackPointer, currentRes.nextInstruction));
@@ -993,7 +994,7 @@ Result<CodeResult> CodeGenerator::generateCaseStatement(TreeNode* node, CodeInpu
 
     // FINALLY we patch all the end jumps from the Statement bodies to end up here
     for (int jumpIndex : endJumps) {
-        generatedCode[jumpIndex] = "goto " + std::to_string(currentRes.nextInstruction);
+        generatedCode[jumpIndex - 1] = "goto " + std::to_string(currentRes.nextInstruction);
     }
 
     return Result<CodeResult>::Ok(currentRes);
@@ -1059,7 +1060,7 @@ Result<CodeResult> CodeGenerator::generateLoopStatement(TreeNode* node, CodeInpu
     exitPatchStack.pop_back();
 
     for (int patchIndex : exits) {
-        generatedCode[patchIndex] = "goto " + std::to_string(currentRes.nextInstruction);
+        generatedCode[patchIndex - 1] = "goto " + std::to_string(currentRes.nextInstruction);
     }
 
     return Result<CodeResult>::Ok(currentRes);
