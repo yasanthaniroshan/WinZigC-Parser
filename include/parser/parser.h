@@ -14,10 +14,10 @@ struct ParserError : public Error {
 };
 
 class Parser {
-public:
+public: 
     Parser(const std::vector<Token>& tokens);
     ~Parser();
-    Result<void> parse(bool printAbstractSyntaxTree = false);
+    Result<TreeNode*> parse(bool printAbstractSyntaxTree = false);
     Result<TreeNode*> parseTree();
 
 private:
