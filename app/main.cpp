@@ -74,6 +74,10 @@ int main(int argc, char** argv) {
         LOG_ERROR(parserResult.error_message.value());
         return 1;
     }
+    if(result.printAbstractSyntaxTree) {
+        LOG_DEBUG("Parsing successful. Abstract Syntax Tree printed above.");
+        return 0;
+    }
     LOG_DEBUG("Parser parsed successfully");
     auto semanticAnalyzer = SemanticAnalyzer(parserResult.value.value());
     auto semanticResult = semanticAnalyzer.analyze();

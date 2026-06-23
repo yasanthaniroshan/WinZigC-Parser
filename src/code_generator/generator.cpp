@@ -27,7 +27,7 @@ Result<void> CodeGenerator::generate()
 {
     LOG_DEBUG("Starting code generation.");
     generateProgram(ast, CodeInput(0, 1));
-    printGeneratedCode();
+    // printGeneratedCode();
     saveGeneratedCode();
     return Result<void>::Ok();
 }

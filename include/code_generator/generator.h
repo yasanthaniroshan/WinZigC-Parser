@@ -51,7 +51,7 @@ public:
         for (const auto& line : generatedCode) {
             outFile << line << std::endl;
         }
-        LOG_INFO("Generated code saved to " + outputFile);
+        LOG_DEBUG("Generated code saved to " + outputFile);
     }
 
 private:
