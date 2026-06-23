@@ -49,10 +49,33 @@ Result<CodeResult> CodeGenerator::generateProgram(TreeNode *node, CodeInput inpu
     Result<CodeResult> constsCode = generateConsts(consts, input);
     Result<CodeResult> typesCode = generateTypes(types, input);
     Result<CodeResult> dclnsCode = generateDclns(dclns, input); // Does nothing -- see function docstring
-    Result<CodeResult> subprogsCode = generateSubprogs(subprogs, input);
-    Result<CodeResult> bodyCode = generateBody(body, input);
-    // Combine the generated code from all components
-    return Result<CodeResult>::Ok(CodeResult(0, 0));
+    
+    CodeResult currentRes = CodeResult(input.stackPointer, input.nextInstruction);
+
+    // Before generating functions we need an unconditional jump - otherwise program
+    // will sequentially execute function and sub-program code as well
+    int mainJumpIndex = currentRes.nextInstruction;
+    emit("goto -1"); // placeholder unconditional jump - supposed to point beyond all sub-program instrs
+    currentRes.nextInstruction++;
+
+    // Generate functions and sub-program instructions    
+    Result<CodeResult> subprogsCode = generateSubprogs(subprogs, CodeInput(currentRes.stackPointer, currentRes.nextInstruction));
+    if (!subprogsCode.success) return subprogsCode;
+    currentRes = subprogsCode.value.value();
+
+    // Patch eariler goto to point HERE - start of the main body
+    generatedCode[mainJumpIndex] = "goto " + std::to_string(currentRes.nextInstruction);
+
+    // Generate Main program body
+    Result<CodeResult> bodyCode = generateBody(body, CodeInput(currentRes.stackPointer, currentRes.nextInstruction));
+    if (!bodyCode.success) return bodyCode;
+    currentRes = bodyCode.value.value();
+
+    // end of the program
+    emit("stop");
+    currentRes.nextInstruction++;
+
+    return Result<CodeResult>::Ok(currentRes); // fin.
 }
 
 Result<CodeResult> CodeGenerator::generateConsts(TreeNode *node, CodeInput input)
@@ -82,12 +105,127 @@ Result<CodeResult> CodeGenerator::generateDclns(TreeNode *node, CodeInput input)
     return Result<CodeResult>::Ok(CodeResult(input.stackPointer, input.nextInstruction));
 }
 
+/**
+ * Iterate over the Fcn node children
+ */
 Result<CodeResult> CodeGenerator::generateSubprogs(TreeNode *node, CodeInput input)
 {
-    // TODO: implement subprogram code generation
-    return Result<CodeResult>::Ok(CodeResult(0, 0));
+    LOG_INFO("Generating subprogs");
+    CodeResult currentRes = CodeResult(input.stackPointer, input.nextInstruction);
+    
+    if (node == nullptr || node->value != "subprogs") return Result<CodeResult>::Ok(currentRes);
+
+    TreeNode* fcnNode = node->left;
+    while (fcnNode != nullptr) {
+        auto fcnRes = generateFcn(fcnNode, CodeInput(currentRes.stackPointer, currentRes.nextInstruction));
+        if (!fcnRes.success) return fcnRes;
+        currentRes = fcnRes.value.value();
+
+        fcnNode = fcnNode->right;
+    }
+
+    return Result<CodeResult>::Ok(currentRes);    
 }
 
+/**
+ * Our convention is that the CALLER must PUSH arguments to the stack before calling
+ * the function (callee). I.e., it then the responsibility of the callee (function) 
+ * to pop arguments off the stack and save them mapped to relevant parameter names.
+ */
+Result<CodeResult> CodeGenerator::generateFcn(TreeNode *node, CodeInput input)
+{
+    LOG_INFO("Generating Fcn code.");
+    CodeResult currentRes = CodeResult(input.stackPointer, input.nextInstruction);
+
+    TreeNode *nameNode = node->left;
+    std::string fcnName = nameNode->left->value; 
+
+    // Save the function's starting instruction address
+    functionAddresses[fcnName] = currentRes.nextInstruction;
+
+    // Re-enter function scope so we map to correct local variables
+    Symbol* fcnSym = symbolTable.lookup(fcnName);
+    if (fcnSym) {
+        symbolTable.reenterScope(fcnSym->scopeIndex);
+    } // errors?
+
+    TreeNode *paramsNode = nameNode->right;
+    // Below three (type, consts, types) are not needed but kept commented for clarity of traversal
+    // TreeNode* typeNameNode = paramsNode->right;
+    // TreeNode* constsNode = paramsNode->right->right;
+    // TreeNode* typesNode = paramsNode->right->right->right;
+    TreeNode *dclnsNode = paramsNode->right->right->right->right;
+    TreeNode *bodyNode = dclnsNode->right;
+
+    // The Prologue - map function arguments pushed on the stack into absolute memory addresses
+    std::vector<std::string> paramNames;
+    if (paramsNode->value == "params") {
+        TreeNode *dclnNode = paramsNode->left;
+        while (dclnNode != nullptr) {
+            if (dclnNode->value == "var") {
+                TreeNode *identNode = dclnNode->left;
+                while (identNode != nullptr && identNode->right != nullptr) {
+                    paramNames.push_back(identNode->left->value);
+                    identNode = identNode->right;
+                    // NOTE: Final sibling is the type. Since iteration condition checks
+                    // (identNode->right != nullptr), final node won't be iterated
+                    // over, making sure type is not added to the paramNames 
+                }
+            }
+            dclnNode = dclnNode->right; // each sibling is a 'var' node
+        }
+    }
+
+    // Saving arguments from stack into parameter values
+    // NOTE: Since arguments are pushed left-to-right, LAST argument is at the TOP
+    // of the stack - popping must be in reverse the order.
+    for (int i = static_cast<int>(paramNames.size()) - 1 ; i >= 0 ; i--) {
+        Symbol *sym = symbolTable.lookup(paramNames[i]);
+        if (sym) {
+            emit("save", sym->address);
+            currentRes.stackPointer--; // save will pop from stack
+            currentRes.nextInstruction++;
+        }
+    }
+
+    // Generate function body
+    auto bodyRes = generateBody(bodyNode, CodeInput(currentRes.stackPointer, currentRes.nextInstruction));
+    if (!bodyRes.success) return bodyRes;
+    currentRes = bodyRes.value.value();
+
+    // Emit fallback instruction
+    emit("return");
+    currentRes.nextInstruction++;
+
+    // clean up the scope
+    if (fcnSym) {
+        symbolTable.exitScope();
+    }
+
+    return Result<CodeResult>::Ok(currentRes);
+}
+
+/**
+ * Statement -> 'return' Expression
+ * Evaluate expression, assuming expression will leave result on top of stack.
+ */
+Result<CodeResult> CodeGenerator::generateReturnStatement(TreeNode *node, CodeInput input) {
+    LOG_INFO("Generating return statement");
+
+    // evaluate return expression
+    auto exprRes = generateExpression(node->left, input);
+    if (!exprRes.success) return exprRes;
+    CodeResult currentRes = exprRes.value.value();
+
+    emit("return");
+    currentRes.nextInstruction++;
+
+    return Result<CodeResult>::Ok(currentRes);
+}
+
+/**
+ * 
+ */
 Result<CodeResult> CodeGenerator::generateBody(TreeNode *node, CodeInput input)
 {
     LOG_INFO("Generating code for program body with node value: " + node->value);
@@ -145,6 +283,8 @@ Result<CodeResult> CodeGenerator::generateStatement(TreeNode *node, CodeInput in
         return generateLoopStatement(node, input);
     } else if (node->value == "exit") {
         return generateExitStatement(node, input);
+    } else if (node->value == "return") {
+        return generateReturnStatement(node, input);
     }
 
     LOG_ERROR("Unsupported statement node type: " + node->value);
@@ -225,6 +365,44 @@ Result<CodeResult> CodeGenerator::generateExpression(TreeNode *node, CodeInput i
     } else if (node->value == "false") {
         emit("lit", 0);
         return Result<CodeResult>::Ok(CodeResult(currentInput.stackPointer + 1, currentInput.nextInstruction + 1));
+    } 
+    // function call
+    else if (node->value == "call") {
+        std::string fcnName = node->left->left->value;
+
+        // Evaluate arguments and push to stack - arguments exist as sibling Expression
+        // tree nodes with parent call and left-most sibling being function-name (extracted above)
+        TreeNode *argNode = node->left->right;
+        CodeResult currentRes = CodeResult(currentInput.stackPointer, currentInput.nextInstruction);
+        
+        // NOTE: left-to-right traversal means top of the stack will contain
+        // right-most Expression (function argument).
+        while (argNode != nullptr) {
+            // iterate along sibling Expression nodes
+            auto argRes = generateExpression(argNode, CodeInput(currentRes.stackPointer, currentRes.nextInstruction));
+            if (!argRes.success) return argRes;
+            currentRes = argRes.value.value();
+            
+            argNode = argNode->right;
+        }
+
+        // verify whether function exists
+        if (functionAddresses.find(fcnName) == functionAddresses.end()) {
+            return Result<CodeResult>::Err(CodeGeneratorError("Call to undefined function: " + fcnName));
+        }
+
+        // emit a call instruction - call the function
+        emit("call", functionAddresses[fcnName]);
+        currentRes.nextInstruction++;
+
+        // Calculate the overall stack change due to the call 
+        // call consumes some 'n' arguments but pushes only 1 return value
+        Symbol *sym = symbolTable.lookup(fcnName);
+        if (sym && sym->kind == SymbolKind::Function) {
+            currentRes.stackPointer = currentRes.stackPointer - sym->paramCount + 1;
+        }
+
+        return Result<CodeResult>::Ok(currentRes);
     }
 
     // === 2. Unary operators (one child)
