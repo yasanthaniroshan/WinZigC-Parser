@@ -459,3 +459,44 @@ end t.)";
     auto tokens = Tokenizer(source).tokenize();
     EXPECT_FALSE(tokens.success);
 }
+
+// ---------------------------------------------------------------------------
+// Direct Parser entry-point coverage (parse() / parseTree() / printing).
+// ---------------------------------------------------------------------------
+
+TEST_F(ParserGrammarTest, ParseSucceedsAndPrintsAstWhenRequested) {
+    const std::string src =
+        "program p:\n"
+        "begin\n"
+        "end p.\n";
+    auto tokens = Tokenizer(src).tokenize();
+    ASSERT_TRUE(tokens.success);
+
+    Parser parser(tokens.value.value());
+    testing::internal::CaptureStdout();
+    auto result = parser.parse(true);
+    const std::string out = testing::internal::GetCapturedStdout();
+    EXPECT_TRUE(result.success);
+    EXPECT_NE(out.find("program(7)"), std::string::npos);
+}
+
+TEST_F(ParserGrammarTest, ParseSucceedsWithoutPrintingAst) {
+    const std::string src =
+        "program p:\n"
+        "begin\n"
+        "end p.\n";
+    auto tokens = Tokenizer(src).tokenize();
+    ASSERT_TRUE(tokens.success);
+
+    Parser parser(tokens.value.value());
+    testing::internal::CaptureStdout();
+    auto result = parser.parse(false);
+    const std::string out = testing::internal::GetCapturedStdout();
+    EXPECT_TRUE(result.success);
+    EXPECT_TRUE(out.empty());
+}
+
+TEST_F(ParserGrammarTest, ParserErrorMessageIsPrefixed) {
+    ParserError e("boom");
+    EXPECT_EQ(e.message(), "ParserError: boom");
+}

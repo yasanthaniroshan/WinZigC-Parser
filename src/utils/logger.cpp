@@ -18,23 +18,23 @@ void Logger::init(const std::string& name) {
 }
 
 void Logger::debug(const std::string& msg) {
-    _logger->debug(msg);
+    if (_logger) _logger->debug(msg);
 }
 
 void Logger::info(const std::string& msg) {
-    _logger->info(msg);
+    if (_logger) _logger->info(msg);
 }
 
 void Logger::warn(const std::string& msg) {
-    _logger->warn(msg);
+    if (_logger) _logger->warn(msg);
 }
 
 void Logger::error(const std::string& msg) {
-    _logger->error(msg);
+    if (_logger) _logger->error(msg);
 }
 
 void Logger::setLevel(spdlog::level::level_enum level) {
-    _logger->set_level(level);
+    if (_logger) _logger->set_level(level);
 }
 
 spdlog::level::level_enum Logger::getLevel() {

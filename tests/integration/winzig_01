@@ -9,7 +9,7 @@
 program factors:
 
 var
-    i : integer; 
+    i, d : integer; 
 
 function Factor ( i : integer ):integer;
 var

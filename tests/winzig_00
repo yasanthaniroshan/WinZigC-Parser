@@ -1,5 +1,5 @@
 program hello:
-
+var x:integer; y:char;
 begin
-  output("Hello world");
+  if x > 0 then output("Hello") else output("World");
 end hello.

@@ -10,6 +10,8 @@
 #include "utils/filereader.h"
 #include "tokenizer/tokenizer.h"
 #include "parser/parser.h"
+#include "semantic_analyzer/analyzer.h"
+#include "code_generator/generator.h"
 
 namespace {
 
@@ -73,5 +75,17 @@ int main(int argc, char** argv) {
         return 1;
     }
     LOG_DEBUG("Parser parsed successfully");
+    auto semanticAnalyzer = SemanticAnalyzer(parserResult.value.value());
+    auto semanticResult = semanticAnalyzer.analyze();
+    if (!semanticResult.success) {
+        LOG_ERROR(semanticResult.error_message.value());
+        return 1;
+    }
+    auto codeGenerator = CodeGenerator(parserResult.value.value(), semanticAnalyzer.getSymbolTable());
+    auto codeGenerationResult = codeGenerator.generate();
+    if (!codeGenerationResult.success) {
+        LOG_ERROR(codeGenerationResult.error_message.value());
+        return 1;
+    }
     return 0;
 }

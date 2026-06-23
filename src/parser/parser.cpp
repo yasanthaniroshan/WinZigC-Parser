@@ -35,15 +35,15 @@ Result<TreeNode*> Parser::parseTree() {
 }
 
 // Parse the WinZigC program.
-Result<void> Parser::parse(bool printAbstractSyntaxTree) {
+Result<TreeNode*> Parser::parse(bool printAbstractSyntaxTree) {
     auto result = parseTree();
     if (!result.success) {
-        return Result<void>::Err(ParserError(result.error_message.value_or("parse failed")));
+        return Result<TreeNode*>::Err(ParserError(result.error_message.value_or("parse failed")));
     }
     if (printAbstractSyntaxTree) {
         printTree(result.value.value(), 0);
     }
-    return Result<void>::Ok();
+    return Result<TreeNode*>::Ok(result.value.value());
 }
 
 // Check if the end of the tokens is reached.
@@ -915,7 +915,7 @@ void Parser::primary() {
         case TokensType::Plus: {
             advance(); // consume the plus keyword
             primary(); // parse the primary
-            buildTree("+", 1);
+            // buildTree("+", 1);
             break;
         }
         // Parsing Primary -> 'not' Primary
@@ -1128,6 +1128,10 @@ void Parser::push(TreeNode* node) {
 
 // Pop a node from the stack.
 TreeNode* Parser::pop() {
+    if (stack.empty()) {
+        LOG_ERROR("Stack is empty");
+        return nullptr;
+    }
     TreeNode* node = stack.back();
     stack.pop_back();
     return node;
@@ -1139,6 +1143,10 @@ void Parser::buildTree(std::string x, int n) {
     TreeNode* parent = nullptr;
     for (int i = 0; i < n; i++) {
         TreeNode* child = pop();
+        if (child == nullptr) {
+            LOG_ERROR("Child is null");
+            return;
+        }
         child->right = parent;
         parent = child;
     }
