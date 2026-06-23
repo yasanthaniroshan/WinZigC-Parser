@@ -194,7 +194,13 @@ Result<CodeResult> CodeGenerator::generateFcn(TreeNode *node, CodeInput input)
     if (!bodyRes.success) return bodyRes;
     currentRes = bodyRes.value.value();
 
-    // Emit fallback instruction
+    // Fallback path: reached only if the body falls off the end without an
+    // explicit return. A value-returning function must still leave exactly one
+    // value on the stack so the caller's consume (e.g. `save`) stays balanced;
+    // otherwise the operand stack drifts on every call. Default to 0.
+    emit("lit", 0);
+    currentRes.stackPointer++;
+    currentRes.nextInstruction++;
     emit("return");
     currentRes.nextInstruction++;
 
@@ -286,6 +292,8 @@ Result<CodeResult> CodeGenerator::generateStatement(TreeNode *node, CodeInput in
         return generateExitStatement(node, input);
     } else if (node->value == "return") {
         return generateReturnStatement(node, input);
+    } else if (node->value == "block") {
+        return generateBody(node, input);
     }
 
     LOG_ERROR("Unsupported statement node type: " + node->value);
@@ -371,6 +379,9 @@ Result<CodeResult> CodeGenerator::generateExpression(TreeNode *node, CodeInput i
         // characters are therefore single-quotes and thus disregarded.
         int charAscii = (val.length() >= 3) ? static_cast<int>(val[1]) : 0;
         // if no character then 0 is default. 0 corresponds to ASCII null character
+        emit("lit", charAscii);
+        return Result<CodeResult>::Ok(CodeResult(currentInput.stackPointer + 1, currentInput.nextInstruction + 1));
+
     } else if (node->value == "<identifier>") {
         std::string name = node->left->value;
         Symbol *sym = symbolTable.lookup(name);
@@ -654,7 +665,7 @@ Result<CodeResult> CodeGenerator::generateWhileStatement(TreeNode *node, CodeInp
     std::vector<int> exitsToPatch = exitPatchStack.back();
     exitPatchStack.pop_back();
     for (int exitInstrIndex : exitsToPatch) {
-        generatedCode[exitInstrIndex] = "goto " + std::to_string(currentRes.nextInstruction);
+        generatedCode[exitInstrIndex - 1] = "goto " + std::to_string(currentRes.nextInstruction);
     }
     // We patch the exits within the loop-body to point to the instruction immediately
     // after the loop's `goto LOOP_START` instruction.
@@ -984,7 +995,7 @@ Result<CodeResult> CodeGenerator::generateCaseStatement(TreeNode* node, CodeInpu
 
     // Generate the OTHERWISE block if it exists
     // The 'goto DEFAULT' jump above has to be patched to point HERE
-    generatedCode[defaultJumpIndex - 1] = "goto " + std::to_string(currentRes.nextInstruction++);
+    generatedCode[defaultJumpIndex - 1] = "goto " + std::to_string(currentRes.nextInstruction);
 
     if (otherwiseClause != nullptr) {
         auto otherwRes = generateStatement(otherwiseClause->left, CodeInput(currentRes.stackPointer, currentRes.nextInstruction));

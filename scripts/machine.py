@@ -38,8 +38,21 @@ class StackMachine:
         self.code = code
         self.stack = [0] * stack_size
         self.call_stack = [] # for tracking function calls
-        self.top = -1
-        self.pc = 0 
+
+        # Variables live at the bottom of the stack at the absolute addresses
+        # assigned by the code generator (referenced by `save n` / `load n`).
+        # The operand stack must start ABOVE this region, otherwise pushed
+        # operands clobber variables (and vice-versa). Reserve one slot per
+        # variable address by starting `top` at the highest address used.
+        max_addr = -1
+        for instr in code:
+            if instr[0] in ("save", "load") and instr[1] is not None:
+                try:
+                    max_addr = max(max_addr, int(instr[1]))
+                except ValueError:
+                    pass
+        self.top = max_addr # slots 0..max_addr are reserved for variables
+        self.pc = 0
         self.input_ptr = 0
 
     def push(self, value):
