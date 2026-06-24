@@ -598,7 +598,7 @@ void SemanticAnalyzer::analyzeAssignment(TreeNode *node)
         rightType = getSemanticTypeFromSymbolType(rightSym->type);
         if (leftType != rightType)
         {
-            LOG_ERROR("Type mismatch in swap statement. '" + leftNode->left->value + "' has type '" + symbolTypeToString(leftSym->type) + "', but '" + rightNode->left->value + "' has type '" + symbolTypeToString(rightSym->type) + "'.");
+            LOG_ERROR("Error in " + std::to_string(leftNode->line) + ":" + std::to_string(leftNode->column) + " : '" + leftNode->left->value + "' has type '" + symbolTypeToString(leftSym->type) + "', but '" + rightNode->left->value + "' has type '" + symbolTypeToString(rightSym->type) + "'.");
             return;
         }
     }

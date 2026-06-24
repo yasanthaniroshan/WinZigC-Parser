@@ -79,6 +79,6 @@ private:
     void push(TreeNode* node); // Push a node onto the stack.
     TreeNode* pop(); // Pop a node from the stack.
 
-    void buildTree(std::string x, int n); // Build the tree.
+    void buildTree(std::string x, int n,int line = -1, int column = -1); // Build the tree.
 };
 #endif

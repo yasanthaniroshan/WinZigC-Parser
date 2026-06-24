@@ -1,5 +1,7 @@
 program hello:
 var x:integer; y:char;
 begin
-  if x > 0 then output(x) else output(y);
+  x := 10;
+  y := 'A';
+  x :=: y;
 end hello.
