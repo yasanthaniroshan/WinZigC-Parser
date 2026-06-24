@@ -23,6 +23,17 @@ Result<void> SemanticAnalyzer::analyze()
 {
     analyzeProgram(ast);
     // symbolTable.printAllScopes(); // Print all scopes for debugging
+    if (!errors.empty())
+    {
+        std::cerr << "\n";
+        for (const auto &error : errors)
+        {
+            diagnostics::error(error.msg, error.line, error.column);
+        }
+        std::string summary = "Semantic analysis failed with " + std::to_string(errors.size()) + " error(s).";
+        diagnostics::summary(summary);
+        return Result<void>::Err(BaseError(summary));
+    }
     return Result<void>::Ok();
 }
 
@@ -596,7 +607,9 @@ void SemanticAnalyzer::analyzeAssignment(TreeNode *node)
         rightType = getSemanticTypeFromSymbolType(rightSym->type);
         if (leftType != rightType)
         {
-            LOG_ERROR("Error in " + std::to_string(leftNode->line) + ":" + std::to_string(leftNode->column) + " : '" + leftNode->left->value + "' has type '" + symbolTypeToString(leftSym->type) + "', but '" + rightNode->left->value + "' has type '" + symbolTypeToString(rightSym->type) + "'.");
+            std::string msg = "Type mismatch in swap statement. Left identifier '" + leftNode->left->value + "' has type '" + symbolTypeToString(leftSym->type) + "', but right identifier '" + rightNode->left->value + "' has type '" + symbolTypeToString(rightSym->type) + "'.";
+            SemanticError error(msg, current->line, current->column);
+            errors.push_back(error);
             return;
         }
     }

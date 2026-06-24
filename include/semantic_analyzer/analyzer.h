@@ -2,10 +2,14 @@
 #define SEMANTIC_ANALYZER_H
 
 #include <iostream>
+#include <string>
+#include <unordered_map>
+#include <vector>
 #include <queue> 
 #include "common/result.h"
 #include "common/error.h"
 #include "utils/logger.h"
+#include "utils/diagnostics.h"
 #include "utils/tree.h"
 #include "tokenizer/tokenizer.h"
 #include "semantic_analyzer/symbol.h"
@@ -18,6 +22,17 @@ enum class SemanticType {
     UserDefined,
     Unknown
 };
+
+struct SemanticError : public Error {
+    std::string msg;
+    int line;
+    int column;
+    SemanticError(std::string m, int l = -1, int c = -1) : msg(std::move(m)), line(l), column(c) {}
+    std::string message() const override {
+        std::string locationInfo = (line >= 0 && column >= 0) ? " at line " + std::to_string(line) + ", column " + std::to_string(column) : "";
+        return "SemanticError: " + msg + locationInfo;
+    }
+};
 class SemanticAnalyzer {
 public:
     SemanticAnalyzer(TreeNode* ast);
@@ -28,6 +43,7 @@ public:
 private:
     TreeNode* ast; // The abstract syntax tree to analyze.
     SymbolTable symbolTable; // The symbol table for semantic analysis.
+    std::vector<SemanticError> errors; // A list to store semantic errors encountered during analysis.
 
     void analyzeProgram(TreeNode* node);
 
