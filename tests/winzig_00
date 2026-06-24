@@ -1,7 +1,7 @@
 program hello:
 var x:integer; y:char;
 begin
-  x := 10;
+  x :=: 10;
   y := 'A';
   x :=: y;
 end hello.

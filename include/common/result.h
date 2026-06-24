@@ -28,6 +28,18 @@ struct Result {
         return r;
     }
 
+    // Build an error result from an already-formatted message, without wrapping it
+    // in an Error. 
+    static Result ErrMsg(std::string message) {
+        Result r;
+        r.success = false;
+        r.error_message = std::move(message);
+        return r;
+    }
+
+    bool isOk() const { return success; }
+    bool isErr() const { return !success; }
+
     friend bool operator==(const Result& a, const Result& b) {
         return a.success == b.success && a.value == b.value && a.error_message == b.error_message;
     }
@@ -51,6 +63,18 @@ struct Result<void> {
         r.error_message = std::forward<E>(e).message();
         return r;
     }
+
+    // Build an error result from an already-formatted message, without wrapping it
+    // in an Error, so propagating an error across Result types doesn't re-prefix it.
+    static Result ErrMsg(std::string message) {
+        Result r;
+        r.success = false;
+        r.error_message = std::move(message);
+        return r;
+    }
+
+    bool isOk() const { return success; }
+    bool isErr() const { return !success; }
 
     friend bool operator==(const Result& a, const Result& b) {
         return a.success == b.success && a.error_message == b.error_message;
