@@ -7,19 +7,29 @@
 ![macOS](https://img.shields.io/badge/macOS-supported-success)
 ![Windows](https://img.shields.io/badge/Windows-supported-success)
 
-A recursive-descent parser for the WinZigC language. It tokenizes source files, builds an abstract syntax tree, and can print that tree for debugging.
+A compiler for the WinZigC language. It runs a four-stage pipeline — **tokenize → parse → semantic analysis → code generation** — turning a `.winzig` source file into stack-machine assembly. The abstract syntax tree can also be printed for debugging.
+
+The stages:
+
+1. **Tokenizer** — lexes the source into tokens.
+2. **Parser** — recursive-descent parser that builds an abstract syntax tree.
+3. **Semantic analyzer** — builds a symbol table and enforces scope/type rules (see `docs/AttributeGrammer.md`).
+4. **Code generator** — emits stack-machine assembly (see `docs/instruction_set.md`) to an output file (`output.asm` by default).
+
+When `--ast` is passed, the pipeline stops after parsing and prints the tree.
 
 ## Project layout
 
 | Path | Purpose |
 |------|---------|
 | `app/` | `winzigc` executable entry point |
-| `include/` | Public headers (`common/`, `utils/`, `tokenizer/`, `parser/`) |
+| `include/` | Public headers (`common/`, `utils/`, `tokenizer/`, `parser/`, `semantic_analyzer/`, `code_generator/`) |
 | `src/` | Library implementations |
 | `tests/unit/` | GoogleTest unit tests |
 | `tests/grammar/` | Small grammar fixtures (`.winzig` + `.tree`) |
 | `tests/integration/` | Full-program golden trees |
-| `docs/` | Grammar PDFs and this guide |
+| `winzig_test_programs/` | Sample WinZigC programs and their expected `.tree` output |
+| `docs/` | Grammar PDFs, instruction set, attribute grammar, and this guide |
 | `build/` | Out-of-tree build directory (created by CMake; gitignored) |
 | `logs/` | Log files when file logging is enabled (gitignored) |
 
@@ -27,9 +37,11 @@ A recursive-descent parser for the WinZigC language. It tokenizes source files, 
 
 | Target | Type | Description |
 |--------|------|-------------|
-| `winzigc` | executable | CLI driver (tokenize + parse) |
+| `winzigc` | executable | CLI driver (tokenize → parse → analyze → codegen) |
 | `parser` | static library | Parser + AST (`tree`) |
 | `tokenizer` | static library | Lexer |
+| `semantic_analyzer` | static library | Symbol table + semantic checks |
+| `code_generator` | static library | Stack-machine code emission |
 | `utils` | static library | Argparser, file reader |
 | `winzig_log` | static library | Logging (spdlog) |
 | `tree` | static library | AST node utilities |
@@ -131,8 +143,8 @@ Ensure a `logs/` directory exists if file logging is enabled.
 | `-v`, `--version` | Print version metadata and exit |
 | `-l`, `--log-level <LEVEL>` | `DEBUG`, `INFO`, `WARN`, or `ERROR` |
 | `-i`, `--input-file <path>` | Input `.winzig` file |
-| `-o`, `--output-file <path>` | Output path (default: `output.txt`) |
-| `-a`, `--ast` | Print the abstract syntax tree |
+| `-o`, `--output-file <path>` | Output path for generated assembly (default: `output.asm`) |
+| `-a`, `--ast` | Print the abstract syntax tree and stop (skips analysis/codegen) |
 | `<input>` | Positional input file (alternative to `-i`) |
 | `-h`, `--help` | Show CLI help (provided by CLI11) |
 
@@ -148,7 +160,7 @@ Ensure a `logs/` directory exists if file logging is enabled.
 ./build/winzigc tests/grammar/const_list.winzig -o out.txt
 ```
 
-On success the process exits with code `0`; on parse/tokenize/IO errors it exits with `1` and logs the error.
+On success the process writes stack-machine assembly to the output file (`output.asm` by default) and exits with code `0`; on tokenize/parse/semantic/codegen/IO errors it exits with `1` and logs the error.
 
 ## Tests
 
@@ -217,3 +229,5 @@ git push origin v0.1.1
 
 - `docs/WinZigC_Grammar.pdf` — language grammar
 - `docs/WinzigC_Lex.pdf` — lexical rules
+- `docs/AttributeGrammer.md` — semantic rules enforced by the analyzer
+- `docs/instruction_set.md` — stack-machine instruction set emitted by codegen

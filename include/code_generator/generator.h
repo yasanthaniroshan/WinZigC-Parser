@@ -51,7 +51,7 @@ public:
         for (const auto& line : generatedCode) {
             outFile << line << std::endl;
         }
-        LOG_INFO("Generated code saved to " + outputFile);
+        LOG_DEBUG("Generated code saved to " + outputFile);
     }
 
 private:
@@ -59,6 +59,8 @@ private:
     SymbolTable symbolTable; // The symbol table for code generation.
     std::string outputFile; // The output file for the generated code
     std::vector<std::string> generatedCode; // Store generated code lines
+    std::vector<std::vector<int>> exitPatchStack; // for tracking nested loops for loop..pool-exit 
+    std::unordered_map<std::string, int> functionAddresses; // tracks starting instr index of each function
     Result<CodeResult> generateProgram(TreeNode* node, CodeInput input = CodeInput(0, 0));
     Result<CodeResult> generateConsts(TreeNode* node, CodeInput input = CodeInput(0, 0));
     Result<CodeResult> generateTypes(TreeNode* node, CodeInput input = CodeInput(0, 0));
@@ -68,8 +70,24 @@ private:
     Result<CodeResult> generateStatement(TreeNode* node, CodeInput input = CodeInput(0, 0));
     Result<CodeResult> generateExpression(TreeNode* node, CodeInput input = CodeInput(0, 0)); // Assuming this will be implemented to handle expressions
     Result<CodeResult> generateOutputStatement(TreeNode* node, CodeInput input = CodeInput(0, 0));
-
     Result<CodeResult> generateString(TreeNode* node, CodeInput input);
+    Result<CodeResult> generateAssignment(TreeNode* node, CodeInput input);
+    Result<CodeResult> generateSwap(TreeNode* node, CodeInput input);
+    Result<CodeResult> generateIfStatement(TreeNode* node, CodeInput input);
+    Result<CodeResult> generateWhileStatement(TreeNode* node, CodeInput input);
+    Result<CodeResult> generateReadStatement(TreeNode* node, CodeInput input);
+    Result<CodeResult> generateRepeatStatement(TreeNode* node, CodeInput input);
+    Result<CodeResult> generateForStatement(TreeNode* node, CodeInput input);
+    Result<CodeResult> generateCaseStatement(TreeNode* node, CodeInput input);
+    Result<CodeResult> generateLoopStatement(TreeNode* node, CodeInput input);
+    Result<CodeResult> generateExitStatement(TreeNode* node, CodeInput input);    
+    Result<CodeResult> generateFcn(TreeNode* node, CodeInput input); 
+    Result<CodeResult> generateReturnStatement(TreeNode* node, CodeInput input);
+
+    // helper functions for code generation
+    void emit (const std::string& instr);
+    void emit (const std::string& instr, int operand);
+    void emit (const std::string& intr, const std::string& operand);
 };
 
 #endif // CODE_GENERATOR_H
