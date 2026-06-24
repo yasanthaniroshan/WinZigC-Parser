@@ -76,7 +76,7 @@ Implemented by `SymbolTable` (`enterScope` / `exitScope`,
 | 17 | A `case` selector must be integer, char, boolean, or a user-defined type. | `Case expression has an unknown type.` |
 | 18 | Each non-literal `case` label must be a declared constant/enum literal. | `Case constant 'Bogus' is not declared.` |
 | 19 | An `output` argument must be an integer or character expression (strings are handled separately). | `Output statement expects an integer or character expression.` |
-| 20 | A `return` statement carries an expression; all returns in a function must agree on type, and a function must contain at least one. | `Type mismatch in return statements. …` / `No return statements found in function.` |
+| 20 | A `return` statement must carry an expression, and inside a function the returned value must match the function's declared return type (so all returns in a function agree). | `Return statement has no expression.` / `Return type mismatch in function 'F'. …` |
 | 21 | An assignment's right-hand side type must match the declared type of the target. | `Type mismatch in assignment to 'x'. …` |
 | 22 | Both operands of a swap (`:=:`) must be declared and share the same type. | `Type mismatch in swap statement. …` / `One of the identifiers in the swap statement is not declared.` |
 
@@ -105,20 +105,27 @@ These are deliberate simplifications made by the analyzer:
    Other arithmetic operators are not assumed for type members.
 3. The predeclared literals `true` and `false` are treated as boolean
    constants.
-4. A function's return type is optional; a missing return type is treated as
-   `void` (represented internally as the unknown/`UserDefined` fallback).
+4. A function's return type is taken from its declaration and mapped to a
+   `SymbolType` by `Symbol::getSymbolType` (`integer`, `char`, `string`,
+   `boolean`, otherwise `UserDefined`). There is **no** `void` symbol type:
+   `SymbolType` only has `Integer`, `Char`, `String`, `Boolean`, and
+   `UserDefined`. The return type is recorded on the function's symbol and is
+   used by the inference described in point 5 — it is not discarded.
 5. When a variable that has not been declared is assigned the result of a
    function call, it is declared implicitly with the function's return type.
    User-defined types cannot be inferred this way and must be declared
    explicitly.
+
 
 ## Tests
 
 These rules are exercised by
 [`tests/unit/test_analyzer.cpp`](../tests/unit/test_analyzer.cpp), which feeds
 small WinZigC programs through tokenize → parse → analyze and asserts on the
-collected diagnostics. Run them with:
+collected diagnostics. The underlying scope/symbol store has its own tests in
+[`tests/unit/test_symbol_table.cpp`](../tests/unit/test_symbol_table.cpp). Run
+them with:
 
 ```bash
-./build/tests --gtest_filter='SemanticAnalyzerTest.*'
+./build/tests --gtest_filter='SemanticAnalyzerTest.*:SymbolTableTest.*'
 ```

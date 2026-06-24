@@ -380,6 +380,64 @@ end t.)";
     EXPECT_TRUE(outcome.diagnostics.empty());
 }
 
+TEST_F(SemanticAnalyzerTest, AcceptsFunctionReturningUserDefinedType) {
+    const std::string source = R"(program t:
+type Color = ( red, green );
+function pick ( n : integer ) : Color;
+begin
+  return(red)
+end pick;
+begin
+  output(0)
+end t.)";
+    auto outcome = analyzeSource(source);
+    EXPECT_TRUE(outcome.success);
+    EXPECT_TRUE(outcome.diagnostics.empty());
+}
+
+TEST_F(SemanticAnalyzerTest, AcceptsFunctionWithoutReturnStatement) {
+    // Functions may omit `return` entirely (e.g. procedures); this must not error.
+    const std::string source = R"(program t:
+function F ( x : integer ) : integer;
+begin
+  output(x)
+end F;
+begin
+  output(0)
+end t.)";
+    auto outcome = analyzeSource(source);
+    EXPECT_TRUE(outcome.success);
+    EXPECT_TRUE(outcome.diagnostics.empty());
+}
+
+TEST_F(SemanticAnalyzerTest, RejectsReturnTypeMismatch) {
+    const std::string source = R"(program t:
+function F ( x : integer ) : integer;
+begin
+  return('a')
+end F;
+begin
+  output(F(1))
+end t.)";
+    auto outcome = analyzeSource(source);
+    EXPECT_FALSE(outcome.success);
+    EXPECT_TRUE(outcome.containsMessage("Return type mismatch in function 'F'"));
+}
+
+TEST_F(SemanticAnalyzerTest, RejectsConflictingReturnTypesInSameFunction) {
+    const std::string source = R"(program t:
+function F ( x : integer ) : integer;
+begin
+  if x = 1 then return(1) else return('a')
+end F;
+begin
+  output(F(1))
+end t.)";
+    auto outcome = analyzeSource(source);
+    EXPECT_FALSE(outcome.success);
+    EXPECT_TRUE(outcome.containsMessage("Return type mismatch in function 'F'"));
+}
+
 TEST_F(SemanticAnalyzerTest, AcceptsForLoopWithEmptyCondition) {
     const std::string source = R"(program t:
 var i : integer;
@@ -427,6 +485,7 @@ begin
   b := c = 'a';
   b := (i < 1) = (i > 2);
   b := p = q;
+  i := -i;
   i := succ(i);
   i := pred(i);
   c := chr(i);
@@ -473,6 +532,30 @@ end t.)";
     auto outcome = analyzeSource(source);
     EXPECT_FALSE(outcome.success);
     EXPECT_TRUE(outcome.containsMessage("One of the identifiers in the swap statement is not declared"));
+}
+
+TEST_F(SemanticAnalyzerTest, AcceptsUnaryMinusOnInteger) {
+    const std::string source = R"(program t:
+var i : integer;
+begin
+  i := -i;
+  output(i)
+end t.)";
+    auto outcome = analyzeSource(source);
+    EXPECT_TRUE(outcome.success);
+    EXPECT_TRUE(outcome.diagnostics.empty());
+}
+
+TEST_F(SemanticAnalyzerTest, RejectsUnaryMinusOnNonInteger) {
+    const std::string source = R"(program t:
+var c : char;
+    i : integer;
+begin
+  i := -c
+end t.)";
+    auto outcome = analyzeSource(source);
+    EXPECT_FALSE(outcome.success);
+    EXPECT_TRUE(outcome.containsMessage("Unary minus operator requires an integer operand"));
 }
 
 TEST_F(SemanticAnalyzerTest, RejectsInferringUserDefinedTypeFromAssignment) {

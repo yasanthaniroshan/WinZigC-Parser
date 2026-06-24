@@ -1,5 +1,23 @@
 #include "semantic_analyzer/analyzer.h"
 
+namespace {
+
+std::string semanticTypeToString(SemanticType type)
+{
+    switch (type)
+    {
+        case SemanticType::Integer:     return "integer";
+        case SemanticType::Char:        return "char";
+        case SemanticType::String:      return "string";
+        case SemanticType::Boolean:     return "boolean";
+        case SemanticType::UserDefined: return "user-defined";
+        case SemanticType::Unknown:     return "unknown";
+    }
+    return "unknown";
+}
+
+}  // namespace
+
 SemanticAnalyzer::SemanticAnalyzer(TreeNode *ast) : ast(ast), symbolTable()
 {
 }
@@ -306,11 +324,24 @@ void SemanticAnalyzer::analyzeFcn(TreeNode *node)
     {
         declared->scopeIndex = functionScope;
     }
+    // Remember the declared return type so `return` statements in the body can be
+    // checked against it. Saved/restored to stay correct even if functions nest.
+    bool savedInFunction = inFunction;
+    SemanticType savedReturnType = currentReturnType;
+    std::string savedFunctionName = currentFunctionName;
+    inFunction = true;
+    currentReturnType = getSemanticTypeFromSymbolType(funcSymbol.type);
+    currentFunctionName = funcSymbol.name;
+
     analyzeParams(paramsNode);
     analyzeConsts(constsNode);
     analyzeTypes(typesNode);
     analyzeDclns(dclnsNode);
     analyzeBody(bodyNode);
+
+    inFunction = savedInFunction;
+    currentReturnType = savedReturnType;
+    currentFunctionName = savedFunctionName;
     symbolTable.exitScope(); // Leave the function scope
 
     LOG_DEBUG("Declared function '" + funcSymbol.name + "' with return type '" + symbolTypeToString(funcSymbol.type) + "' and " + std::to_string(funcSymbol.paramCount) + " parameters.");
@@ -547,7 +578,18 @@ void SemanticAnalyzer::analyzeStatement(TreeNode *node)
         if (current != nullptr)
         {
             LOG_DEBUG("Analyzing return statement with expression.");
-            analyzeExpression(current);
+            SemanticType returnedType = analyzeExpression(current);
+            // Inside a function, the returned value must match the declared return
+            // type. Comparing every return against the same declared type also
+            // forces all returns in the function to agree with one another.
+            if (inFunction && returnedType != SemanticType::Unknown &&
+                returnedType != currentReturnType)
+            {
+                addError("Return type mismatch in function '" + currentFunctionName +
+                             "'. Expected '" + semanticTypeToString(currentReturnType) +
+                             "', but got '" + semanticTypeToString(returnedType) + "'.",
+                         node);
+            }
         }
         else
         {
@@ -735,7 +777,11 @@ SemanticType SemanticAnalyzer::analyzeTerm(TreeNode *node)
 {
     // Implementation for analyzing a term and determining its type
     TreeNode *current = node;
-    if (current->value == "+" || current->value == "-" || current->value == "or")
+    // '+', '-', and 'or' are binary operators here. A unary minus is a '-' node with a single operand (no right sibling)
+    bool isBinaryTermOp = current->value == "+" || current->value == "or" ||
+                          (current->value == "-" && current->left != nullptr &&
+                           current->left->right != nullptr);
+    if (isBinaryTermOp)
     {
         TreeNode *leftNode = current->left;    // First child is the left operand
         TreeNode *rightNode = leftNode->right; // Next sibling is the right operand
@@ -949,47 +995,3 @@ SemanticType SemanticAnalyzer::analyzePrimary(TreeNode *node)
     }
 }
 
-SemanticType SemanticAnalyzer::findReturnNodes(TreeNode *node)
-{
-    std::vector<TreeNode *> returnNodes;
-    int childCount = countChildren(node);
-    TreeNode *current = node->left; // Start with the first child
-    std::queue<TreeNode *> nodesToVisit;
-    nodesToVisit.push(current);
-    while (!nodesToVisit.empty())
-    {
-        TreeNode *currentNode = nodesToVisit.front();
-        nodesToVisit.pop();
-        if (currentNode->value == "return")
-        {
-            returnNodes.push_back(currentNode);
-        }
-        else
-        {
-            // Add all children of the current node to the queue
-            TreeNode *child = currentNode->left;
-            while (child != nullptr)
-            {
-                nodesToVisit.push(child);
-                child = child->right;
-            }
-        }
-    }
-
-    if (returnNodes.empty())
-    {
-        addError("No return statements found in function.", node);
-        return SemanticType::Unknown;
-    }
-    SemanticType returnType = analyzeExpression(returnNodes[0]->left); // Analyze the expression being returned in the first return statement
-    for (auto returnNode : returnNodes)
-    {
-        SemanticType currentReturnType = analyzeExpression(returnNode->left);
-        if (currentReturnType != returnType)
-        {
-            addError("Type mismatch in return statements. Expected type: " + std::to_string(static_cast<int>(returnType)) + ", but got: " + std::to_string(static_cast<int>(currentReturnType)) + ".", returnNode);
-            return SemanticType::Unknown;
-        }
-    }
-    return returnType;
-}
