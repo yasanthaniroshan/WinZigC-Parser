@@ -328,3 +328,161 @@ end t.)";
     EXPECT_FALSE(outcome.success);
     EXPECT_TRUE(outcome.containsMessage("No statements in body"));
 }
+
+// --- More positive cases: exercise each statement / expression form ----------
+
+TEST_F(SemanticAnalyzerTest, AcceptsRepeatStatement) {
+    const std::string source = R"(program t:
+var x : integer;
+    y : integer;
+begin
+  repeat x := 1; y := 2 until x = y
+end t.)";
+    auto outcome = analyzeSource(source);
+    EXPECT_TRUE(outcome.success);
+    EXPECT_TRUE(outcome.diagnostics.empty());
+}
+
+TEST_F(SemanticAnalyzerTest, AcceptsLoopWithExit) {
+    const std::string source = R"(program t:
+var x : integer;
+begin
+  loop x := 1; exit; pool
+end t.)";
+    auto outcome = analyzeSource(source);
+    EXPECT_TRUE(outcome.success);
+    EXPECT_TRUE(outcome.diagnostics.empty());
+}
+
+TEST_F(SemanticAnalyzerTest, AcceptsReadStatement) {
+    const std::string source = R"(program t:
+var a : integer;
+    b : integer;
+begin
+  read(a, b)
+end t.)";
+    auto outcome = analyzeSource(source);
+    EXPECT_TRUE(outcome.success);
+    EXPECT_TRUE(outcome.diagnostics.empty());
+}
+
+TEST_F(SemanticAnalyzerTest, AcceptsFunctionWithReturnStatement) {
+    const std::string source = R"(program t:
+function F ( x : integer ) : integer;
+begin
+  return(x)
+end F;
+begin
+  output(F(1))
+end t.)";
+    auto outcome = analyzeSource(source);
+    EXPECT_TRUE(outcome.success);
+    EXPECT_TRUE(outcome.diagnostics.empty());
+}
+
+TEST_F(SemanticAnalyzerTest, AcceptsForLoopWithEmptyCondition) {
+    const std::string source = R"(program t:
+var i : integer;
+    x : integer;
+begin
+  for (i := 1; ; i := i + 1) x := i
+end t.)";
+    auto outcome = analyzeSource(source);
+    EXPECT_TRUE(outcome.success);
+    EXPECT_TRUE(outcome.diagnostics.empty());
+}
+
+TEST_F(SemanticAnalyzerTest, AcceptsCaseWithRangeCharAndOtherwise) {
+    const std::string source = R"(program t:
+var x : integer;
+    y : integer;
+begin
+  case x of
+    1: y := 1;
+    'a': y := 3
+  otherwise
+    y := 0
+  end
+end t.)";
+    auto outcome = analyzeSource(source);
+    EXPECT_TRUE(outcome.success);
+    EXPECT_TRUE(outcome.diagnostics.empty());
+}
+
+TEST_F(SemanticAnalyzerTest, AcceptsArithmeticLogicalAndBuiltinExpressions) {
+    const std::string source = R"(program t:
+type Color = ( red, green );
+var i : integer;
+    b : boolean;
+    c : char;
+    p : Color;
+    q : Color;
+begin
+  i := 1 + 2 - 3 * 4 / 2 mod 2;
+  b := (i < 2) and (i > 0);
+  b := (i <= 2) or (i >= 0);
+  b := not b;
+  b := i = 1;
+  b := i <> 2;
+  b := c = 'a';
+  b := (i < 1) = (i > 2);
+  b := p = q;
+  i := succ(i);
+  i := pred(i);
+  c := chr(i);
+  i := ord(c);
+  b := eof
+end t.)";
+    auto outcome = analyzeSource(source);
+    EXPECT_TRUE(outcome.success);
+    EXPECT_TRUE(outcome.diagnostics.empty());
+}
+
+TEST_F(SemanticAnalyzerTest, InfersTypeOfUndeclaredVariableFromAssignment) {
+    // Assigning to an undeclared name infers its type from the right-hand side.
+    const std::string source = R"(program t:
+begin
+  newvar := 5;
+  output(newvar)
+end t.)";
+    auto outcome = analyzeSource(source);
+    EXPECT_TRUE(outcome.success);
+    EXPECT_TRUE(outcome.diagnostics.empty());
+}
+
+// --- More negative cases -----------------------------------------------------
+
+TEST_F(SemanticAnalyzerTest, RejectsSwapOfMismatchedTypes) {
+    const std::string source = R"(program t:
+var x : integer;
+    y : char;
+begin
+  x :=: y
+end t.)";
+    auto outcome = analyzeSource(source);
+    EXPECT_FALSE(outcome.success);
+    EXPECT_TRUE(outcome.containsMessage("Type mismatch in swap statement"));
+}
+
+TEST_F(SemanticAnalyzerTest, RejectsSwapWithUndeclaredIdentifier) {
+    const std::string source = R"(program t:
+var x : integer;
+begin
+  x :=: z
+end t.)";
+    auto outcome = analyzeSource(source);
+    EXPECT_FALSE(outcome.success);
+    EXPECT_TRUE(outcome.containsMessage("One of the identifiers in the swap statement is not declared"));
+}
+
+TEST_F(SemanticAnalyzerTest, RejectsInferringUserDefinedTypeFromAssignment) {
+    const std::string source = R"(program t:
+type Color = ( red, green );
+begin
+  newp := red;
+  output(0)
+end t.)";
+    auto outcome = analyzeSource(source);
+    EXPECT_FALSE(outcome.success);
+    EXPECT_TRUE(outcome.containsMessage("Cannot infer user-defined type for identifier 'newp'"));
+}
