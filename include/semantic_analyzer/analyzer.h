@@ -40,10 +40,17 @@ public:
     SymbolTable getSymbolTable() const { return symbolTable; }
     Result<void> analyze();
 
+    // Collected semantic errors from the most recent analyze() call.
+    const std::vector<SemanticError>& getErrors() const { return errors; }
+
 private:
     TreeNode* ast; // The abstract syntax tree to analyze.
     SymbolTable symbolTable; // The symbol table for semantic analysis.
     std::vector<SemanticError> errors; // A list to store semantic errors encountered during analysis.
+
+    // Records a semantic error, tagging it with the source position of `node`
+    // (line/column default to -1 when `node` is null or carries no position).
+    void addError(const std::string& message, TreeNode* node);
 
     void analyzeProgram(TreeNode* node);
 

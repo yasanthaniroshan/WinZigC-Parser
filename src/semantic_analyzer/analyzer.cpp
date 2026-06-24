@@ -19,6 +19,13 @@ bool SemanticAnalyzer::isCharLiteral(TreeNode *node)
     return node != nullptr && node->value == "<char>";
 }
 
+void SemanticAnalyzer::addError(const std::string &message, TreeNode *node)
+{
+    int line = node ? node->line : -1;
+    int column = node ? node->column : -1;
+    errors.push_back(SemanticError(message, line, column));
+}
+
 Result<void> SemanticAnalyzer::analyze()
 {
     analyzeProgram(ast);
@@ -58,14 +65,14 @@ void SemanticAnalyzer::analyzeProgram(TreeNode *node)
     TreeNode *subprogs = dclns->right; // Next sibling is subprogram declarations
     if (subprogs->right == nullptr)
     {
-        LOG_ERROR("Program body is missing.");
+        addError("Program body is missing.", node);
         return;
     }
     TreeNode *body = subprogs->right; // Next sibling is the body of the program
     TreeNode *endName = body->right;  // Next sibling is the end name of the program
     if (name->left->value != endName->left->value)
     {
-        LOG_ERROR("Program name '" + name->left->value + "' end name '" + endName->left->value + "' does not match.");
+        addError("Program name '" + name->left->value + "' end name '" + endName->left->value + "' does not match.", endName->left);
         return;
     }
     analyzeConsts(consts);
@@ -101,7 +108,7 @@ void SemanticAnalyzer::analyzeConst(TreeNode *node)
     auto isDefined = symbolTable.lookup(constSymbol.name);
     if (isDefined != nullptr)
     {
-        LOG_ERROR("Constant '" + constSymbol.name + "' is already declared in the current scope.");
+        addError("Constant '" + constSymbol.name + "' is already declared in the current scope.", identifierNode->left);
         return;
     }
     TreeNode *constValue = identifierNode->right; // Next sibling is the constant value
@@ -120,7 +127,7 @@ void SemanticAnalyzer::analyzeConst(TreeNode *node)
         auto typeSymbol = symbolTable.lookup(constValue->left->value);
         if (typeSymbol == nullptr)
         {
-            LOG_ERROR("Type '" + constValue->left->value + "' for constant '" + constSymbol.name + "' is not declared.");
+            addError("Type '" + constValue->left->value + "' for constant '" + constSymbol.name + "' is not declared.", constValue->left);
             return;
         }
         constSymbol.type = typeSymbol->type;
@@ -128,7 +135,7 @@ void SemanticAnalyzer::analyzeConst(TreeNode *node)
     }
     if (!symbolTable.declare(constSymbol))
     {
-        LOG_ERROR("Constant '" + constSymbol.name + "' is already declared in the current scope.");
+        addError("Constant '" + constSymbol.name + "' is already declared in the current scope.", identifierNode->left);
         return;
     }
     LOG_DEBUG("Declared constant '" + constSymbol.name + "' of type '" + symbolTypeToString(constSymbol.type) + "'.");
@@ -168,7 +175,7 @@ void SemanticAnalyzer::analyzeType(TreeNode *node)
     }
     if (!symbolTable.declare(typeSymbol))
     {
-        LOG_ERROR("Type '" + typeName + "' is already declared in the current scope.");
+        addError("Type '" + typeName + "' is already declared in the current scope.", identifierNode->left);
         return;
     }
     int ordinalValue = 0;
@@ -182,7 +189,7 @@ void SemanticAnalyzer::analyzeType(TreeNode *node)
         memberSymbol.ordinal = ordinalValue++; // Assign an ordinal value to the member
         if (!symbolTable.declare(memberSymbol))
         {
-            LOG_ERROR("Member '" + member + "' of type '" + typeName + "' is already declared in the current scope.");
+            addError("Member '" + member + "' of type '" + typeName + "' is already declared in the current scope.", identifierNode->left);
             return;
         }
     }
@@ -232,14 +239,14 @@ void SemanticAnalyzer::analyzeDcln(TreeNode *node)
             auto typeSymbol = symbolTable.lookup(typeNode->left->value);
             if (typeSymbol == nullptr)
             {
-                LOG_ERROR("Type '" + typeNode->left->value + "' for variable '" + varSymbol.name + "' is not declared.");
+                addError("Type '" + typeNode->left->value + "' for variable '" + varSymbol.name + "' is not declared.", typeNode->left);
                 return;
             }
             varSymbol.typeName = typeNode->left->value;
         }
         if (!symbolTable.declare(varSymbol))
         {
-            LOG_ERROR("Variable '" + varSymbol.name + "' is already declared in the current scope.");
+            addError("Variable '" + varSymbol.name + "' is already declared in the current scope.", variable_node->left);
             return;
         }
         LOG_DEBUG("Declared variable '" + varSymbol.name + "' of type '" + symbolTypeToString(varSymbol.type) + "'.");
@@ -277,7 +284,7 @@ void SemanticAnalyzer::analyzeFcn(TreeNode *node)
     TreeNode *endNameNode = bodyNode->right;      // Next sibling is the end name of the function
     if (identifierNode->left->value != endNameNode->left->value)
     {
-        LOG_ERROR("Function '" + identifierNode->left->value + "' end name '" + endNameNode->left->value + "' does not match.");
+        addError("Function '" + identifierNode->left->value + "' end name '" + endNameNode->left->value + "' does not match.", endNameNode->left);
         return;
     }
     // Declare the function in the enclosing scope BEFORE analyzing its body,
@@ -289,7 +296,7 @@ void SemanticAnalyzer::analyzeFcn(TreeNode *node)
     funcSymbol.paramCount = countChildren(paramsNode->left); // Count the number of parameters
     if (!symbolTable.declare(funcSymbol))
     {
-        LOG_ERROR("Function '" + funcSymbol.name + "' is already declared in the current scope.");
+        addError("Function '" + funcSymbol.name + "' is already declared in the current scope.", identifierNode->left);
         return;
     }
 
@@ -315,7 +322,7 @@ void SemanticAnalyzer::analyzeParams(TreeNode *node)
     TreeNode *current = node;
     if (current->left == nullptr)
     {
-        LOG_ERROR("No parameters declared."); // looks like this language requires parameters for functions, so this is an error
+        addError("No parameters declared.", current); // looks like this language requires parameters for functions, so this is an error
         return;
     }
     LOG_DEBUG("Node value for parameters: " + current->value);
@@ -334,7 +341,7 @@ void SemanticAnalyzer::analyzeBody(TreeNode *node)
     TreeNode *current = node;
     if (current->left == nullptr)
     {
-        LOG_ERROR("No statements in body."); // looks like this language requires at least one statement in the body, so this is an error
+        addError("No statements in body.", current); // looks like this language requires at least one statement in the body, so this is an error
         return;
     }
     LOG_DEBUG("Node value for body: " + current->value);
@@ -362,7 +369,7 @@ void SemanticAnalyzer::analyzeStatement(TreeNode *node)
         SemanticType conditionType = analyzeExpression(conditionNode);
         if (conditionType != SemanticType::Boolean)
         {
-            LOG_ERROR("Condition in 'if' statement must be of boolean type.");
+            addError("Condition in 'if' statement must be of boolean type.", conditionNode);
             return;
         }
         analyzeStatement(thenNode);
@@ -382,7 +389,7 @@ void SemanticAnalyzer::analyzeStatement(TreeNode *node)
         SemanticType conditionType = analyzeExpression(conditionNode);
         if (conditionType != SemanticType::Boolean)
         {
-            LOG_ERROR("Condition in 'while' statement must be of boolean type.");
+            addError("Condition in 'while' statement must be of boolean type.", conditionNode);
             return;
         }
         analyzeStatement(bodyNode);
@@ -401,7 +408,7 @@ void SemanticAnalyzer::analyzeStatement(TreeNode *node)
         SemanticType untilType = analyzeExpression(untilNode);
         if (untilType != SemanticType::Boolean)
         {
-            LOG_ERROR("Condition in 'repeat' statement must be of boolean type.");
+            addError("Condition in 'repeat' statement must be of boolean type.", untilNode);
             return;
         }
         TreeNode *bodyNode = node->left; // First child is the body of the repeat loop
@@ -425,7 +432,7 @@ void SemanticAnalyzer::analyzeStatement(TreeNode *node)
         SemanticType forExpType = analyzeForExpression(forExp);
         if (forExpType != SemanticType::Boolean)
         {
-            LOG_ERROR("Condition in 'for' statement must be of boolean type.");
+            addError("Condition in 'for' statement must be of boolean type.", forExp);
             return;
         }
         analyzeStatement(forStatEnd);
@@ -471,7 +478,7 @@ void SemanticAnalyzer::analyzeStatement(TreeNode *node)
                     return;
                 // Otherwise it must be a previously declared identifier (e.g. an enum literal).
                 if (symbolTable.lookup(constValue->left->value) == nullptr)
-                    LOG_ERROR("Case constant '" + constValue->left->value + "' is not declared.");
+                    addError("Case constant '" + constValue->left->value + "' is not declared.", constValue->left);
             };
 
             // Each following sibling of the selector is its own "case_clause" subtree
@@ -505,7 +512,7 @@ void SemanticAnalyzer::analyzeStatement(TreeNode *node)
         }
         else
         {
-            LOG_ERROR("Case expression has an unknown type.");
+            addError("Case expression has an unknown type.", caseExpNode);
             return;
         }
         if (hasOtherwise)
@@ -544,7 +551,7 @@ void SemanticAnalyzer::analyzeStatement(TreeNode *node)
         }
         else
         {
-            LOG_ERROR("Analyzing return statement with no expression.");
+            addError("Return statement has no expression.", node);
         }
     }
     else if (node->value == "<null>")
@@ -575,19 +582,19 @@ void SemanticAnalyzer::analyzeAssignment(TreeNode *node)
             newIdentifier.type = getSymbolTypeFromSemanticType(exprType);
             if (newIdentifier.type == SymbolType::UserDefined)
             {
-                LOG_ERROR("Cannot infer user-defined type for identifier '" + newIdentifier.name + "'. Please declare the variable with an explicit type.");
+                addError("Cannot infer user-defined type for identifier '" + newIdentifier.name + "'. Please declare the variable with an explicit type.", leftNode->left);
                 return;
             }
             if (!symbolTable.declare(newIdentifier))
             {
-                LOG_ERROR("Variable '" + newIdentifier.name + "' is already declared in the current scope.");
+                addError("Variable '" + newIdentifier.name + "' is already declared in the current scope.", leftNode->left);
                 return;
             }
             return;
         }
         if (getSemanticTypeFromSymbolType(sym->type) != exprType)
         {
-            LOG_ERROR("Type mismatch in assignment to '" + leftNode->value + "'. Expected type: " + symbolTypeToString(sym->type) + ", but got: " + std::to_string(static_cast<int>(exprType)));
+            addError("Type mismatch in assignment to '" + leftNode->value + "'. Expected type: " + symbolTypeToString(sym->type) + ", but got: " + std::to_string(static_cast<int>(exprType)), leftNode->left);
             return;
         }
     }
@@ -600,16 +607,14 @@ void SemanticAnalyzer::analyzeAssignment(TreeNode *node)
         Symbol *rightSym = symbolTable.lookup(rightNode->left->value);
         if (leftSym == nullptr || rightSym == nullptr)
         {
-            LOG_ERROR("One of the identifiers in the swap statement is not declared.");
+            addError("One of the identifiers in the swap statement is not declared.", current);
             return;
         }
         leftType = getSemanticTypeFromSymbolType(leftSym->type);
         rightType = getSemanticTypeFromSymbolType(rightSym->type);
         if (leftType != rightType)
         {
-            std::string msg = "Type mismatch in swap statement. Left identifier '" + leftNode->left->value + "' has type '" + symbolTypeToString(leftSym->type) + "', but right identifier '" + rightNode->left->value + "' has type '" + symbolTypeToString(rightSym->type) + "'.";
-            SemanticError error(msg, current->line, current->column);
-            errors.push_back(error);
+            addError("Type mismatch in swap statement. Left identifier '" + leftNode->left->value + "' has type '" + symbolTypeToString(leftSym->type) + "', but right identifier '" + rightNode->left->value + "' has type '" + symbolTypeToString(rightSym->type) + "'.", current);
             return;
         }
     }
@@ -644,7 +649,7 @@ void SemanticAnalyzer::analyzeOutputStatement(TreeNode *node)
             SemanticType exprType = analyzeExpression(current);
             if (exprType != SemanticType::Integer && exprType != SemanticType::Char)
             {
-                LOG_ERROR("Output statement expects an integer or character expression.");
+                addError("Output statement expects an integer or character expression.", current);
                 return;
             }
         }
@@ -688,7 +693,7 @@ SemanticType SemanticAnalyzer::analyzeExpression(TreeNode *node)
         SemanticType rightType = analyzeTerm(rightNode);
         if (leftType != rightType)
         {
-            LOG_ERROR("Type mismatch in relational expression. Left operand has type '" + std::to_string(static_cast<int>(leftType)) + "', but right operand has type '" + std::to_string(static_cast<int>(rightType)) + "'.");
+            addError("Type mismatch in relational expression. Left operand has type '" + std::to_string(static_cast<int>(leftType)) + "', but right operand has type '" + std::to_string(static_cast<int>(rightType)) + "'.", current);
             return SemanticType::Unknown;
         }
         if (current->value == "<>" || current->value == "=")
@@ -760,7 +765,7 @@ SemanticType SemanticAnalyzer::analyzeTerm(TreeNode *node)
                 return SemanticType::Boolean;
             }
         }
-        LOG_ERROR("Type mismatch in term expression. Left operand has type '" + std::to_string(static_cast<int>(leftType)) + "', but right operand has type '" + std::to_string(static_cast<int>(rightType)) + "'.");
+        addError("Type mismatch in term expression. Left operand has type '" + std::to_string(static_cast<int>(leftType)) + "', but right operand has type '" + std::to_string(static_cast<int>(rightType)) + "'.", current);
         return SemanticType::Unknown; // If types are not compatible for term expressions, return unknown
     }
     else
@@ -785,7 +790,7 @@ SemanticType SemanticAnalyzer::analyzeFactor(TreeNode *node)
         // Handle Leave Nodes
         if (leftType != rightType)
         {
-            LOG_ERROR("Type mismatch in factor expression. Left operand has type '" + std::to_string(static_cast<int>(leftType)) + "', but right operand has type '" + std::to_string(static_cast<int>(rightType)) + "'.");
+            addError("Type mismatch in factor expression. Left operand has type '" + std::to_string(static_cast<int>(leftType)) + "', but right operand has type '" + std::to_string(static_cast<int>(rightType)) + "'.", current);
             return SemanticType::Unknown;
         }
         if (current->value == "*" || current->value == "/" || current->value == "mod")
@@ -805,7 +810,7 @@ SemanticType SemanticAnalyzer::analyzeFactor(TreeNode *node)
                 return SemanticType::Boolean;
             }
         }
-        LOG_ERROR("Type mismatch in factor expression. Left operand has type '" + std::to_string(static_cast<int>(leftType)) + "', but right operand has type '" + std::to_string(static_cast<int>(rightType)) + "'.");
+        addError("Type mismatch in factor expression. Left operand has type '" + std::to_string(static_cast<int>(leftType)) + "', but right operand has type '" + std::to_string(static_cast<int>(rightType)) + "'.", current);
         return SemanticType::Unknown; // If types are not compatible for factor expressions, return unknown
     }
     else
@@ -831,7 +836,7 @@ SemanticType SemanticAnalyzer::analyzePrimary(TreeNode *node)
             LOG_DEBUG("Analyzing unary minus expression.");
             return SemanticType::Integer;
         }
-        LOG_ERROR("Unary minus operator requires an integer operand, but got type '" + std::to_string(static_cast<int>(operandType)) + "'.");
+        addError("Unary minus operator requires an integer operand, but got type '" + std::to_string(static_cast<int>(operandType)) + "'.", current);
         return SemanticType::Unknown;
     }
     else if (current->value == "not")
@@ -843,7 +848,7 @@ SemanticType SemanticAnalyzer::analyzePrimary(TreeNode *node)
             LOG_DEBUG("Analyzing logical NOT expression.");
             return SemanticType::Boolean;
         }
-        LOG_ERROR("Logical NOT operator requires a boolean operand, but got type '" + std::to_string(static_cast<int>(operandType)) + "'.");
+        addError("Logical NOT operator requires a boolean operand, but got type '" + std::to_string(static_cast<int>(operandType)) + "'.", current);
         return SemanticType::Unknown;
     }
     else if (current->value == "eof")
@@ -857,7 +862,7 @@ SemanticType SemanticAnalyzer::analyzePrimary(TreeNode *node)
         Symbol *sym = symbolTable.lookup(current->left->value);
         if (sym == nullptr)
         {
-            LOG_ERROR("Identifier '" + current->left->value + "' is not declared.");
+            addError("Identifier '" + current->left->value + "' is not declared.", current->left);
             return SemanticType::Unknown;
         }
         return getSemanticTypeFromSymbolType(sym->type);
@@ -878,12 +883,12 @@ SemanticType SemanticAnalyzer::analyzePrimary(TreeNode *node)
         Symbol *sym = symbolTable.lookup(current->left->left->value);
         if (sym == nullptr)
         {
-            LOG_ERROR("Function '" + current->left->left->value + "' is not declared.");
+            addError("Function '" + current->left->left->value + "' is not declared.", current->left->left);
             return SemanticType::Unknown;
         }
         if (sym->kind != SymbolKind::Function)
         {
-            LOG_ERROR("'" + current->left->left->value + "' is not a function.");
+            addError("'" + current->left->left->value + "' is not a function.", current->left->left);
             return SemanticType::Unknown;
         }
         return getSemanticTypeFromSymbolType(sym->type);
@@ -898,7 +903,7 @@ SemanticType SemanticAnalyzer::analyzePrimary(TreeNode *node)
             LOG_DEBUG("Analyzing successor or predecessor function with integer operand.");
             return SemanticType::Integer;
         }
-        LOG_ERROR("Successor or predecessor function requires an integer operand, but got type '" + std::to_string(static_cast<int>(operandType)) + "'.");
+        addError("Successor or predecessor function requires an integer operand, but got type '" + std::to_string(static_cast<int>(operandType)) + "'.", current);
         return SemanticType::Unknown;
     }
     else if (current->value == "ord" || current->value == "chr")
@@ -913,7 +918,7 @@ SemanticType SemanticAnalyzer::analyzePrimary(TreeNode *node)
                 LOG_DEBUG("Analyzing ordinal conversion function with character operand.");
                 return SemanticType::Integer;
             }
-            LOG_ERROR("Ordinal conversion function requires a character operand, but got type '" + std::to_string(static_cast<int>(operandType)) + "'.");
+            addError("Ordinal conversion function requires a character operand, but got type '" + std::to_string(static_cast<int>(operandType)) + "'.", current);
             return SemanticType::Unknown;
         }
         else // current->value == "chr"
@@ -923,7 +928,7 @@ SemanticType SemanticAnalyzer::analyzePrimary(TreeNode *node)
                 LOG_DEBUG("Analyzing character conversion function with integer operand.");
                 return SemanticType::Char;
             }
-            LOG_ERROR("Character conversion function requires an integer operand, but got type '" + std::to_string(static_cast<int>(operandType)) + "'.");
+            addError("Character conversion function requires an integer operand, but got type '" + std::to_string(static_cast<int>(operandType)) + "'.", current);
             return SemanticType::Unknown;
         }
     }
@@ -939,7 +944,7 @@ SemanticType SemanticAnalyzer::analyzePrimary(TreeNode *node)
     }
     else
     {
-        LOG_ERROR("Unknown primary expression with node value: " + current->value);
+        addError("Unknown primary expression with node value: " + current->value, current);
         return SemanticType::Unknown;
     }
 }
@@ -973,7 +978,7 @@ SemanticType SemanticAnalyzer::findReturnNodes(TreeNode *node)
 
     if (returnNodes.empty())
     {
-        LOG_ERROR("No return statements found in function.");
+        addError("No return statements found in function.", node);
         return SemanticType::Unknown;
     }
     SemanticType returnType = analyzeExpression(returnNodes[0]->left); // Analyze the expression being returned in the first return statement
@@ -982,7 +987,7 @@ SemanticType SemanticAnalyzer::findReturnNodes(TreeNode *node)
         SemanticType currentReturnType = analyzeExpression(returnNode->left);
         if (currentReturnType != returnType)
         {
-            LOG_ERROR("Type mismatch in return statements. Expected type: " + std::to_string(static_cast<int>(returnType)) + ", but got: " + std::to_string(static_cast<int>(currentReturnType)) + ".");
+            addError("Type mismatch in return statements. Expected type: " + std::to_string(static_cast<int>(returnType)) + ", but got: " + std::to_string(static_cast<int>(currentReturnType)) + ".", returnNode);
             return SemanticType::Unknown;
         }
     }
