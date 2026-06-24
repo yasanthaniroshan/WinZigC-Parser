@@ -122,7 +122,7 @@ target_compile_definitions(tests PRIVATE
     TEST_GRAMMAR_DIR="${CMAKE_SOURCE_DIR}/tests/grammar"
     TEST_INTEGRATION_DIR="${CMAKE_SOURCE_DIR}/tests/integration"
 )
-target_link_libraries(tests PRIVATE gtest_main utils parser semantic_analyzer)
+target_link_libraries(tests PRIVATE gtest_main utils semantic_analyzer)
 
 include(GoogleTest)
 gtest_discover_tests(tests)

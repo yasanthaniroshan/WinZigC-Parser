@@ -22,14 +22,38 @@ Parser::~Parser() {
 
 // ==================== Helper Functions ====================
 
+// A human-readable description of the current token, for error messages.
+std::string Parser::describeCurrent() const {
+    Token token = peek();
+    if (token.type == TokensType::EndOfFile) return "end of input";
+    if (token.lexeme.empty()) return tokenTypeToString(token.type);
+    return "'" + token.lexeme + "'";
+}
+
+// Records the syntax error at the current token. Only the first is kept, since parsing can't recover.
+void Parser::recordError(const std::string& message) {
+    if (!syntaxError.has_value()) {
+        Token token = peek();
+        syntaxError = ParserError(message, token.line, token.column);
+    }
+}
+
+// Records an error at the current token and returns a failing Result for propagation.
+Result<void> Parser::fail(const std::string& message) {
+    recordError(message);
+    return Result<void>::Err(ParserError(message));
+}
+
 Result<TreeNode*> Parser::parseTree() {
     winzig();
-    if (!isAtEnd() && peek().type != TokensType::EndOfFile) {
-        LOG_ERROR("Expected end of file");
-        return Result<TreeNode*>::Err(ParserError("Expected end of file"));
+    if (!syntaxError.has_value() && !isAtEnd() && peek().type != TokensType::EndOfFile) {
+        recordError("expected end of file, found " + describeCurrent());
+    }
+    if (syntaxError.has_value()) {
+        return Result<TreeNode*>::ErrMsg("ParserError: " + syntaxError->msg);
     }
     if (stack.empty()) {
-        return Result<TreeNode*>::Err(ParserError("empty parse stack"));
+        return Result<TreeNode*>::ErrMsg("ParserError: empty parse stack");
     }
     return Result<TreeNode*>::Ok(stack.back());
 }
@@ -37,8 +61,12 @@ Result<TreeNode*> Parser::parseTree() {
 // Parse the WinZigC program.
 Result<TreeNode*> Parser::parse(bool printAbstractSyntaxTree) {
     auto result = parseTree();
-    if (!result.success) {
-        return Result<TreeNode*>::Err(ParserError(result.error_message.value_or("parse failed")));
+    if (syntaxError.has_value()) {
+        // Report the single syntax error with its source location, like a real compiler.
+        std::cerr << "\n";
+        diagnostics::error(syntaxError->msg, syntaxError->line, syntaxError->column);
+        diagnostics::summary("Parsing failed with a syntax error.");
+        return Result<TreeNode*>::ErrMsg("Parsing failed with a syntax error.");
     }
     if (printAbstractSyntaxTree) {
         printTree(result.value.value(), 0);
@@ -74,15 +102,15 @@ Token Parser::advance() {
 }
 
 
-// Consume the current token if it matches the type.
-Token Parser::consume(TokensType type,const std::string& what) {
+// Consume the current token if it matches the type; records an error otherwise.
+Result<void> Parser::consume(TokensType type,const std::string& what) {
     if(check(type)) {
         Token token = advance();
         LOG_DEBUG("Consumed " + what + ": " + token.toString());
-        return token;
+        return Result<void>::Ok();
     }
-    LOG_ERROR("Expected " + what + " but found " + peek().toString());
-    return Token(TokensType::Unknown, "", 0, 0);
+    recordError("expected " + what + ", found " + describeCurrent());
+    return Result<void>::Err(ParserError(syntaxError->msg));
 }
 
 // ==================== Parsing Functions ====================
@@ -94,28 +122,37 @@ Token Parser::consume(TokensType type,const std::string& what) {
 * consts ->
 * @return void
 */
-void Parser::consts() {
+Result<void> Parser::consts() {
     LOG_DEBUG("Parsing constants");
-    // Parsing const ->  
-    // Check for actually are there any consts in the program
+    // Check whether there are any consts in the program
     if(!check(TokensType::Key_const)) {
-        // If there are no consts in the program, push a consts node to the stack
         push(new TreeNode("consts", peek().line, peek().column));
-        return; 
+        return Result<void>::Ok();
     }
-    // If there any consts in this program, parse the consts
     // consts -> 'const' Const list ',' ';'
-    consume(TokensType::Key_const, "const");
-    constDeclaration(); // Parse the const declaration
+    auto result = consume(TokensType::Key_const, "const");
+    if (result.isErr()) {
+        return result;
+    }
+    result = constDeclaration();
+    if (result.isErr()) {
+        return result;
+    }
     int n = 1;
     while (check(TokensType::Comma)) {
         advance(); // consume the comma
-        constDeclaration(); // parse the const declaration
-        n++; // increment the number of const declarations
+        result = constDeclaration();
+        if (result.isErr()) {
+            return result;
+        }
+        n++;
     }
-    buildTree("consts", n, peek().line, peek().column); // Build the tree for the consts statement
-    consume(TokensType::Semicolon, "semicolon"); // consume the semicolon
-    return; // TODO: Need to handle errors here
+    buildTree("consts", n, peek().line, peek().column);
+    result = consume(TokensType::Semicolon, "semicolon");
+    if (result.isErr()) {
+        return result;
+    }
+    return Result<void>::Ok();
 }
 
 /**
@@ -124,14 +161,23 @@ void Parser::consts() {
 * constDeclaration -> identifier '=' constValue
 * @return void
 */
-void Parser::constDeclaration() {
+Result<void> Parser::constDeclaration() {
     LOG_DEBUG("Parsing const declaration");
-    // Parsing const -> identifier '=' constValue
-    identifier();
-    consume(TokensType::Equal, "equal"); // consume the equal sign
-    constValue();
-    buildTree("const", 2, peek().line, peek().column); // Build the tree for the const declaration
-    return; // TODO: Need to handle errors here
+    // constDeclaration -> identifier '=' constValue
+    auto result = identifier();
+    if (result.isErr()) {
+        return result;
+    }
+    result = consume(TokensType::Equal, "equal");
+    if (result.isErr()) {
+        return result;
+    }
+    result = constValue();
+    if (result.isErr()) {
+        return result;
+    }
+    buildTree("const", 2, peek().line, peek().column);
+    return Result<void>::Ok();
 }
 /**
 * @brief Parses the const value.
@@ -139,32 +185,27 @@ void Parser::constDeclaration() {
 * constValue -> integerLiteral | charLiteral | identifier
 * @return void
 */
-void Parser::constValue() {
+Result<void> Parser::constValue() {
     LOG_DEBUG("Parsing const value");
-    // Parsing const value -> integerLiteral | charLiteral | identifier
+    // constValue -> integerLiteral | charLiteral | identifier
+    Result<void> result;
     switch (peek().type) {
         case TokensType::IntegerLiteral:
-        {
-            // Parsing integer literal -> integerLiteral
-            integerLiteral();
+            result = integerLiteral();
             break;
-        }
         case TokensType::CharLiteral:
-        {
-            // Parsing char literal -> charLiteral
-            charLiteral();
+            result = charLiteral();
             break;
-        }
         case TokensType::Identifier:
-        {
-            // Parsing identifier -> identifier
-            identifier();
+            result = identifier();
             break;
-        }
         default:
-        LOG_ERROR("Expected integer literal or string but found " + peek().toString());
-        return;
+            return fail("expected an integer, char, or identifier constant, found " + describeCurrent());
     }
+    if (result.isErr()) {
+        return result;
+    }
+    return Result<void>::Ok();
 }
 /**
 * @brief Parses the identifier.
@@ -172,7 +213,7 @@ void Parser::constValue() {
 * identifier -> Identifier
 * @return void
 */
-void Parser::identifier() {
+Result<void> Parser::identifier() {
     if(check(TokensType::Identifier)) {
         Token token = advance();
         LOG_DEBUG("Identifier found: " + token.toString());
@@ -180,10 +221,9 @@ void Parser::identifier() {
         TreeNode* child = new TreeNode(token.lexeme, token.line, token.column);
         node->left = child;
         push(node);
-        return; // TODO: Need to handle errors here
+        return Result<void>::Ok(); // TODO: Need to handle errors here
     }
-    LOG_ERROR("Expected identifier but found " + peek().toString());
-    return; // TODO: Need to handle errors here
+    return fail("expected an identifier, found " + describeCurrent());
 }
 
 /**
@@ -193,25 +233,28 @@ void Parser::identifier() {
 * types ->
 * @return void
 */
-void Parser::types() {
+Result<void> Parser::types() {
     LOG_DEBUG("Parsing types");
-    // Check if there are any types in the program
+    // Check whether there are any types in the program
     if(!check(TokensType::Key_type)) {
-        // If there are no types in the program, push a types node to the stack
-        // Parsing types -> 
-        push(new TreeNode("types", peek().line, peek().column)); 
-        return; // TODO: Need to handle errors here
+        push(new TreeNode("types", peek().line, peek().column));
+        return Result<void>::Ok();
     }
-    // If there are types in the program, parse the types
-    consume(TokensType::Key_type, "type"); // consume the type keyword
-    // Parsing types -> 'type' Type list ';'
+    // types -> 'type' Type list ';'
+    auto result = consume(TokensType::Key_type, "type");
+    if (result.isErr()) {
+        return result;
+    }
     int n = 0;
     do {
-        typeDeclaration(); // parse the type declaration
-        n++; // increment the number of type declarations
+        result = typeDeclaration();
+        if (result.isErr()) {
+            return result;
+        }
+        n++;
     } while (check(TokensType::Identifier));
-    buildTree("types", n, peek().line, peek().column); // Build the tree for the types statement
-    return; // TODO: Need to handle errors here
+    buildTree("types", n, peek().line, peek().column);
+    return Result<void>::Ok();
 }
 
 /**
@@ -220,14 +263,26 @@ void Parser::types() {
 * typeDeclaration -> identifier '=' litlist
 * @return void
 */
-void Parser::typeDeclaration() {
+Result<void> Parser::typeDeclaration() {
     LOG_DEBUG("Parsing type declaration");
-    identifier();
-    consume(TokensType::Equal, "equal");
-    litlist();
-    consume(TokensType::Semicolon, "semicolon");
+    auto result = identifier();
+    if (result.isErr()) {
+        return result;
+    }
+    result = consume(TokensType::Equal, "equal");
+    if (result.isErr()) {
+        return result;
+    }
+    result = litlist();
+    if (result.isErr()) {
+        return result;
+    }
+    result = consume(TokensType::Semicolon, "semicolon");
+    if (result.isErr()) {
+        return result;
+    }
     buildTree("type", 2, peek().line, peek().column);
-    return; // TODO: Need to handle errors here
+    return Result<void>::Ok();
 }
 
 /**
@@ -236,19 +291,31 @@ void Parser::typeDeclaration() {
 *   litlist -> '(' identifier list ',' ')'
 * @return void
 */
-void Parser::litlist() {
+Result<void> Parser::litlist() {
     LOG_DEBUG("Parsing litlist");
-    consume(TokensType::OpenParen, "open parenthesis"); // consume the open parenthesis
-    identifier(); // parse the identifier
+    auto result = consume(TokensType::OpenParen, "open parenthesis");
+    if (result.isErr()) {
+        return result;
+    }
+    result = identifier();
+    if (result.isErr()) {
+        return result;
+    }
     int n = 1;
     while (check(TokensType::Comma)) {
         advance(); // consume the comma
-        identifier(); // parse the identifier
-        n++; // increment the number of identifiers
+        result = identifier();
+        if (result.isErr()) {
+            return result;
+        }
+        n++;
     }
-    consume(TokensType::CloseParen, "close parenthesis"); // consume the close parenthesis
+    result = consume(TokensType::CloseParen, "close parenthesis");
+    if (result.isErr()) {
+        return result;
+    }
     buildTree("lit", n, peek().line, peek().column);
-    return; // TODO: Need to handle errors here
+    return Result<void>::Ok();
 }
 /** 
 * @brief Parses the subprograms.
@@ -257,28 +324,24 @@ void Parser::litlist() {
 * subprogs ->
 * @return void
 */
-void Parser::subprogs() {
+Result<void> Parser::subprogs() {
     LOG_DEBUG("Parsing subprograms");
-    // Check if there are any subprograms in the program
+    // Check whether there are any subprograms in the program
     if(!check(TokensType::Key_function)) {
-        // If there are no subprograms in the program, push a subprogs node to the stack
-        // Parsing subprogs -> 
         push(new TreeNode("subprogs", peek().line, peek().column));
-        return; // TODO: Need to handle errors here
+        return Result<void>::Ok();
     }
-    // If there are subprograms in the program, parse the subprograms
-    // subprogs -> Fcn
+    // subprogs -> Fcn+
     int n = 0;
-    // do {
-    //     fcn(); // parse the function declaration
-    //     n++; // increment the number of function declarations
-    // } while (check(TokensType::Identifier));
     while(check(TokensType::Key_function)) {
-        fcn(); // parse the function declaration
-        n++; // increment the number of function declarations
+        auto result = fcn();
+        if (result.isErr()) {
+            return result;
+        }
+        n++;
     }
-    buildTree("subprogs", n, peek().line, peek().column); // Build the tree for the subprograms statement
-    return; // TODO: Need to handle errors here
+    buildTree("subprogs", n, peek().line, peek().column);
+    return Result<void>::Ok();
 }
 
 /**
@@ -287,25 +350,67 @@ void Parser::subprogs() {
 * fcn -> 'function' <identifier> '(' Params ')' ':' <identifier> ';' Consts Types Dclns Body Name ';'
 * @return void
 */
-void Parser::fcn() {
+Result<void> Parser::fcn() {
     LOG_DEBUG("Parsing fcn");
-    // Parsing fcn -> 'function' <identifier> '(' Params ')' ':' <identifier> ';' Consts Types Dclns Body Name ';'
-    consume(TokensType::Key_function, "function");
-    identifier();
-    consume(TokensType::OpenParen, "open parenthesis");
-    params();
-    consume(TokensType::CloseParen, "close parenthesis");
-    consume(TokensType::Colon, "colon");
-    identifier();
-    consume(TokensType::Semicolon, "semicolon");
-    consts();
-    types();
-    dclns();
-    body();
-    identifier();
-    consume(TokensType::Semicolon, "semicolon");
+    // fcn -> 'function' <identifier> '(' Params ')' ':' <identifier> ';' Consts Types Dclns Body Name ';'
+    auto result = consume(TokensType::Key_function, "function");
+    if (result.isErr()) {
+        return result;
+    }
+    result = identifier();
+    if (result.isErr()) {
+        return result;
+    }
+    result = consume(TokensType::OpenParen, "open parenthesis");
+    if (result.isErr()) {
+        return result;
+    }
+    result = params();
+    if (result.isErr()) {
+        return result;
+    }
+    result = consume(TokensType::CloseParen, "close parenthesis");
+    if (result.isErr()) {
+        return result;
+    }
+    result = consume(TokensType::Colon, "colon");
+    if (result.isErr()) {
+        return result;
+    }
+    result = identifier();
+    if (result.isErr()) {
+        return result;
+    }
+    result = consume(TokensType::Semicolon, "semicolon");
+    if (result.isErr()) {
+        return result;
+    }
+    result = consts();
+    if (result.isErr()) {
+        return result;
+    }
+    result = types();
+    if (result.isErr()) {
+        return result;
+    }
+    result = dclns();
+    if (result.isErr()) {
+        return result;
+    }
+    result = body();
+    if (result.isErr()) {
+        return result;
+    }
+    result = identifier();
+    if (result.isErr()) {
+        return result;
+    }
+    result = consume(TokensType::Semicolon, "semicolon");
+    if (result.isErr()) {
+        return result;
+    }
     buildTree("fcn", 8, peek().line, peek().column);
-    return; // TODO: Need to handle errors here
+    return Result<void>::Ok();
 }
 
 /**
@@ -314,18 +419,24 @@ void Parser::fcn() {
 * Params -> Dcln list ';'
 * @return void
 */
-void Parser::params() {
+Result<void> Parser::params() {
     LOG_DEBUG("Parsing params");
-    // Parsing params -> Dcln list ';'
-    dcln();
+    // params -> Dcln list ';'
+    auto result = dcln();
+    if (result.isErr()) {
+        return result;
+    }
     int n = 1;
     while (check(TokensType::Semicolon)) {
         advance(); // consume the semicolon
-        dcln(); // parse the dcln
-        n++; // increment the number of dcln
+        result = dcln();
+        if (result.isErr()) {
+            return result;
+        }
+        n++;
     }
-    buildTree("params", n, peek().line, peek().column); // Build the tree for the params statement
-    return; // TODO: Need to handle errors here
+    buildTree("params", n, peek().line, peek().column);
+    return Result<void>::Ok();
 }
 
 /**
@@ -334,19 +445,31 @@ void Parser::params() {
 * dcln -> <identifier> list ',' ':' <identifier> 
 * @return void
 */
-void Parser::dcln() {
+Result<void> Parser::dcln() {
     LOG_DEBUG("Parsing dcln");
-    identifier();
+    auto result = identifier();
+    if (result.isErr()) {
+        return result;
+    }
     int n = 1;
     while (check(TokensType::Comma)) {
         advance(); // consume the comma
-        identifier(); // parse the identifier
-        n++; // increment the number of identifiers
+        result = identifier();
+        if (result.isErr()) {
+            return result;
+        }
+        n++;
     }
-    consume(TokensType::Colon, "colon");
-    identifier();
+    result = consume(TokensType::Colon, "colon");
+    if (result.isErr()) {
+        return result;
+    }
+    result = identifier();
+    if (result.isErr()) {
+        return result;
+    }
     buildTree("var", n+1, peek().line, peek().column);
-    return; // TODO: Need to handle errors here
+    return Result<void>::Ok();
 }
 
 /**
@@ -356,25 +479,32 @@ void Parser::dcln() {
 * dclns ->
 * @return void
 */
-void Parser::dclns() {
+Result<void> Parser::dclns() {
     LOG_DEBUG("Parsing declarations");
-    // Check if there are any declarations in the program
+    // Check whether there are any declarations in the program
     if(!check(TokensType::Key_var)) {
-        // If there are no declarations in the program, push a dclns node to the stack
-        // Parsing dclns -> 
         push(new TreeNode("dclns", peek().line, peek().column));
-        return; // TODO: Need to handle errors here
+        return Result<void>::Ok();
     }
-    // If there are declarations in the program, parse the declarations
-    consume(TokensType::Key_var, "var");
+    // dclns -> 'var' (Dcln ';')+
+    auto result = consume(TokensType::Key_var, "var");
+    if (result.isErr()) {
+        return result;
+    }
     int n = 0;
     do {
-        dcln();
-        consume(TokensType::Semicolon, "semicolon");
-        n++; // increment the number of dcln
+        result = dcln();
+        if (result.isErr()) {
+            return result;
+        }
+        result = consume(TokensType::Semicolon, "semicolon");
+        if (result.isErr()) {
+            return result;
+        }
+        n++;
     } while (check(TokensType::Identifier));
-    buildTree("dclns", n, peek().line, peek().column); // Build the tree for the dclns statement
-    return; // TODO: Need to handle errors here
+    buildTree("dclns", n, peek().line, peek().column);
+    return Result<void>::Ok();
 }
 
 /**
@@ -383,30 +513,71 @@ void Parser::dclns() {
 * body -> 'begin' Statement list ';' 'end'
 * @return void
 */
-void Parser::body() {
+Result<void> Parser::body() {
     LOG_DEBUG("Parsing body");
-    consume(TokensType::Key_begin, "begin");
-    // Check if the body is empty
-    if (check(TokensType::Key_end)) {
-        // If the body is empty, push a block node to the stack
-        // Parsing body -> 'begin' 'end'
-        consume(TokensType::Key_end, "end"); // consume the end keyword
-        buildTree("block", 0, peek().line, peek().column);
-        return; // TODO: Need to handle errors here
+    auto result = consume(TokensType::Key_begin, "begin");
+    if (result.isErr()) {
+        return result;
     }
-    // If the body is not empty, parse the body
-    // Parsing body -> 'begin' Statement list ';' 'end'
-    statement(); // parse the statement
-    int n = 1; 
+    // body -> 'begin' 'end'
+    if (check(TokensType::Key_end)) {
+        result = consume(TokensType::Key_end, "end");
+        if (result.isErr()) {
+            return result;
+        }
+        buildTree("block", 0, peek().line, peek().column);
+        return Result<void>::Ok();
+    }
+    // body -> 'begin' Statement list ';' 'end'
+    result = statement();
+    if (result.isErr()) {
+        return result;
+    }
+    int n = 1;
     while (check(TokensType::Semicolon)) {
         advance(); // consume the semicolon
-        statement();   // may produce <null> when next token is 'end'
-        n++; // increment the number of statements
+        result = statement();   // may produce <null> when next token is 'end'
+        if (result.isErr()) {
+            return result;
+        }
+        n++;
     }
-    consume(TokensType::Key_end, "end"); // consume the end keyword
-    buildTree("block", n, peek().line, peek().column); // Build the tree for the block statement
-    return; // TODO: Need to handle errors here
-} 
+    result = consume(TokensType::Key_end, "end");
+    if (result.isErr()) {
+        return result;
+    }
+    buildTree("block", n, peek().line, peek().column);
+    return Result<void>::Ok();
+}
+
+// True if the token can legally BEGIN a statement (i.e. dispatches into statement()'s switch).
+bool Parser::startsStatement(TokensType type) {
+    switch (type) {
+        case TokensType::Identifier: case TokensType::Key_output:
+        case TokensType::Key_if:     case TokensType::Key_while:
+        case TokensType::Key_repeat: case TokensType::Key_for:
+        case TokensType::Key_loop:   case TokensType::Key_case:
+        case TokensType::Key_read:   case TokensType::Key_exit:
+        case TokensType::Key_return: case TokensType::Key_begin:
+            return true;
+        default:
+            return false;
+    }
+}
+
+// True if the token can legally FOLLOW a statement, i.e. where an empty statement (<null>) is valid.
+bool Parser::followsStatement(TokensType type) {
+    switch (type) {
+        case TokensType::Semicolon: case TokensType::Key_end:
+        case TokensType::Key_until: case TokensType::Key_pool:
+        case TokensType::Key_else:  case TokensType::Key_otherwise:
+        case TokensType::EndOfFile:
+            return true;
+        default:
+            return false;
+    }
+}
+
 /**
 * @brief Parses the statement.
 * @details following the grammar is parsed,
@@ -425,48 +596,85 @@ void Parser::body() {
 * statement -> <null>
 * @return void
 */
-void Parser::statement() {
+Result<void> Parser::statement() {
     LOG_DEBUG("Parsing statement");
-    // Check if the statement is empty
-    if (!(check(TokensType::Identifier) || check(TokensType::Key_output) || check(TokensType::Key_if) || check(TokensType::Key_while) || check(TokensType::Key_repeat) || check(TokensType::Key_for) || check(TokensType::Key_loop) || check(TokensType::Key_case) || check(TokensType::Key_read) || check(TokensType::Key_exit) || check(TokensType::Key_return) || check(TokensType::Key_begin))) {
-        // If the statement is empty, push a null node to the stack
-        // Parsing statement -> <null>
-        push(new TreeNode("<null>", peek().line, peek().column));
-        return; // TODO: Need to handle errors here
+    TokensType t = peek().type;
+    if (!startsStatement(t)) {
+        if (followsStatement(t)) {
+            // Legitimately empty statement (e.g. `begin end`, or a trailing `;` before `end`).
+            // Parsing statement -> <null>
+            push(new TreeNode("<null>", peek().line, peek().column));
+            return Result<void>::Ok();
+        }
+        // The token neither starts nor can follow a statement -> a real syntax error.
+        return fail("expected a statement, found " + describeCurrent());
     }
     switch (peek().type) {
         // Parsing statement -> Assignment
         case TokensType::Identifier:
             {
-                assignment();
+                auto result = assignment();
+                if (result.isErr()) {
+                    return result;
+                }
                 break;
             }
         // Parsing statement -> 'output'  '(' OutExp list ',' ')'
         case TokensType::Key_output:
             {
-                consume(TokensType::Key_output, "output");
-                consume(TokensType::OpenParen, "open parenthesis");
+                auto result = consume(TokensType::Key_output, "output");
+                if (result.isErr()) {
+                    return result;
+                }
+                result = consume(TokensType::OpenParen, "open parenthesis");
+                if (result.isErr()) {
+                    return result;
+                }
                 int n = 1;
-                outexp(); // parse the output expression
+                result = outexp();
+                if (result.isErr()) {
+                    return result;
+                }
                 while(check(TokensType::Comma)) {
                     advance(); // consume the comma
-                    outexp(); // parse the output expression
-                    n++; // increment the number of output expressions
+                    result = outexp();
+                    if (result.isErr()) {
+                        return result;
+                    }
+                    n++;
                 }
-                consume(TokensType::CloseParen, "close parenthesis");
+                result = consume(TokensType::CloseParen, "close parenthesis");
+                if (result.isErr()) {
+                    return result;
+                }
                 buildTree("output", n, peek().line, peek().column);
                 break;
             }
         // Parsing statement -> 'if' Expression 'then' Statement ('else' Statement)?
         case TokensType::Key_if:
             {
-                consume(TokensType::Key_if, "if"); // consume the if keyword
-                expression(); // parse the expression
-                consume(TokensType::Key_then, "then"); // consume the then keyword
-                statement();
+                auto result = consume(TokensType::Key_if, "if");
+                if (result.isErr()) {
+                    return result;
+                }
+                result = expression();
+                if (result.isErr()) {
+                    return result;
+                }
+                result = consume(TokensType::Key_then, "then");
+                if (result.isErr()) {
+                    return result;
+                }
+                result = statement();
+                if (result.isErr()) {
+                    return result;
+                }
                 if(check(TokensType::Key_else)) {
                     advance(); // consume the else keyword
-                    statement();
+                    result = statement();
+                    if (result.isErr()) {
+                        return result;
+                    }
                     buildTree("if", 3, peek().line, peek().column);
                 } else {
                     buildTree("if", 2, peek().line, peek().column);
@@ -476,56 +684,122 @@ void Parser::statement() {
         // Parsing statement -> 'while' Expression 'do' Statement
         case TokensType::Key_while:
             {
-                consume(TokensType::Key_while, "while"); // consume the while keyword
-                expression(); // parse the expression
-                consume(TokensType::Key_do, "do"); // consume the do keyword
-                statement();
+                auto result = consume(TokensType::Key_while, "while");
+                if (result.isErr()) {
+                    return result;
+                }
+                result = expression();
+                if (result.isErr()) {
+                    return result;
+                }
+                result = consume(TokensType::Key_do, "do");
+                if (result.isErr()) {
+                    return result;
+                }
+                result = statement();
+                if (result.isErr()) {
+                    return result;
+                }
                 buildTree("while", 2, peek().line, peek().column);
                 break;
             }
         // Parsing statement -> 'repeat' Statement list ';' 'until' Expression
         case TokensType::Key_repeat:
             {
-                consume(TokensType::Key_repeat, "repeat"); // consume the repeat keyword
+                auto result = consume(TokensType::Key_repeat, "repeat");
+                if (result.isErr()) {
+                    return result;
+                }
                 int n = 1;
-                statement(); // parse the statement
+                result = statement();
+                if (result.isErr()) {
+                    return result;
+                }
                 while(check(TokensType::Semicolon)) {
                     advance(); // consume the semicolon
-                    statement(); // parse the statement
-                    n++; // increment the number of statements
+                    result = statement();
+                    if (result.isErr()) {
+                        return result;
+                    }
+                    n++;
                 }
-                consume(TokensType::Key_until, "until"); // consume the until keyword
-                expression();
+                result = consume(TokensType::Key_until, "until");
+                if (result.isErr()) {
+                    return result;
+                }
+                result = expression();
+                if (result.isErr()) {
+                    return result;
+                }
                 buildTree("repeat", n + 1, peek().line, peek().column);
                 break;
             }
         // Parsing statement -> 'for' '(' ForStatement ';' ForExpression ';' ForStatement ')' Statement
         case TokensType::Key_for:
             {
-                consume(TokensType::Key_for, "for"); // consume the for keyword
-                consume(TokensType::OpenParen, "open parenthesis");
-                forstatement();
-                consume(TokensType::Semicolon, "semicolon");
-                forexpression();
-                consume(TokensType::Semicolon, "semicolon");
-                forstatement();
-                consume(TokensType::CloseParen, "close parenthesis");
-                statement();
+                auto result = consume(TokensType::Key_for, "for");
+                if (result.isErr()) {
+                    return result;
+                }
+                result = consume(TokensType::OpenParen, "open parenthesis");
+                if (result.isErr()) {
+                    return result;
+                }
+                result = forstatement();
+                if (result.isErr()) {
+                    return result;
+                }
+                result = consume(TokensType::Semicolon, "semicolon");
+                if (result.isErr()) {
+                    return result;
+                }
+                result = forexpression();
+                if (result.isErr()) {
+                    return result;
+                }
+                result = consume(TokensType::Semicolon, "semicolon");
+                if (result.isErr()) {
+                    return result;
+                }
+                result = forstatement();
+                if (result.isErr()) {
+                    return result;
+                }
+                result = consume(TokensType::CloseParen, "close parenthesis");
+                if (result.isErr()) {
+                    return result;
+                }
+                result = statement();
+                if (result.isErr()) {
+                    return result;
+                }
                 buildTree("for", 4, peek().line, peek().column);
                 break;
             }
         // Parsing statement -> 'loop' Statement list ';' 'pool'
         case TokensType::Key_loop:
             {
-                consume(TokensType::Key_loop, "loop"); // consume the loop keyword
+                auto result = consume(TokensType::Key_loop, "loop");
+                if (result.isErr()) {
+                    return result;
+                }
                 int n = 1;
-                statement();
+                result = statement();
+                if (result.isErr()) {
+                    return result;
+                }
                 while(check(TokensType::Semicolon)) {
                     advance(); // consume the semicolon
-                    statement(); // parse the statement
-                    n++; // increment the number of statements
+                    result = statement();
+                    if (result.isErr()) {
+                        return result;
+                    }
+                    n++;
                 }
-                consume(TokensType::Key_pool, "pool");
+                result = consume(TokensType::Key_pool, "pool");
+                if (result.isErr()) {
+                    return result;
+                }
                 buildTree("loop",n, peek().line, peek().column);
                 break;
             }
@@ -533,59 +807,105 @@ void Parser::statement() {
         case TokensType::Key_case:
             {
                 bool hasOtherwise = false;
-                consume(TokensType::Key_case, "case"); // consume the case keyword
-                expression(); // parse the expression
-                consume(TokensType::Key_of, "of"); // consume the of keyword
-                int nClauses = caseclauses(); // parse the case clauses
+                auto result = consume(TokensType::Key_case, "case");
+                if (result.isErr()) {
+                    return result;
+                }
+                result = expression();
+                if (result.isErr()) {
+                    return result;
+                }
+                result = consume(TokensType::Key_of, "of");
+                if (result.isErr()) {
+                    return result;
+                }
+                auto clauses = caseclauses(); // parse the case clauses
+                if (clauses.isErr()) {
+                    return Result<void>::ErrMsg(clauses.error_message.value_or("ParserError: parse error"));
+                }
+                int nClauses = clauses.value.value();
                 hasOtherwise = check(TokensType::Key_otherwise);
-                otherwiseclause(); // parse the otherwise clause
-                consume(TokensType::Key_end, "end");
+                result = otherwiseclause();
+                if (result.isErr()) {
+                    return result;
+                }
+                result = consume(TokensType::Key_end, "end");
+                if (result.isErr()) {
+                    return result;
+                }
                 buildTree("case", 1 + nClauses + (hasOtherwise ? 1 : 0), peek().line, peek().column);
                 break;
             }
         // Parsing statement -> 'read' '(' Identifier list ',' ')'
         case TokensType::Key_read:
             {
-                consume(TokensType::Key_read, "read"); // consume the read keyword
-                consume(TokensType::OpenParen, "open parenthesis");
+                auto result = consume(TokensType::Key_read, "read");
+                if (result.isErr()) {
+                    return result;
+                }
+                result = consume(TokensType::OpenParen, "open parenthesis");
+                if (result.isErr()) {
+                    return result;
+                }
                 int n = 1;
-                identifier(); // parse the identifier
+                result = identifier();
+                if (result.isErr()) {
+                    return result;
+                }
                 while(check(TokensType::Comma)) {
                     advance(); // consume the comma
-                    identifier(); // parse the identifier
-                    n++; // increment the number of identifiers
+                    result = identifier();
+                    if (result.isErr()) {
+                        return result;
+                    }
+                    n++;
                 }
-                consume(TokensType::CloseParen, "close parenthesis");
+                result = consume(TokensType::CloseParen, "close parenthesis");
+                if (result.isErr()) {
+                    return result;
+                }
                 buildTree("read", n, peek().line, peek().column);
                 break;
             }
         // Parsing statement -> 'exit'
         case TokensType::Key_exit:
             {
-                consume(TokensType::Key_exit, "exit"); // consume the exit keyword
+                auto result = consume(TokensType::Key_exit, "exit");
+                if (result.isErr()) {
+                    return result;
+                }
                 buildTree("exit", 0, peek().line, peek().column);
                 break;
             }
         // Parsing statement -> 'return' Expression
         case TokensType::Key_return:
             {
-                consume(TokensType::Key_return, "return"); // consume the return keyword
-                expression(); // parse the expression
+                auto result = consume(TokensType::Key_return, "return");
+                if (result.isErr()) {
+                    return result;
+                }
+                result = expression();
+                if (result.isErr()) {
+                    return result;
+                }
                 buildTree("return", 1, peek().line, peek().column);
                 break;
             }
         // Parsing statement -> Body
         case TokensType::Key_begin:
             {
-                body();
+                auto result = body();
+                if (result.isErr()) {
+                    return result;
+                }
                 break;
             }
         default:
             {
-            LOG_ERROR("Expected output expression, if expression, while expression, repeat expression, for expression, loop expression, case expression, read expression, exit expression, return expression, or begin expression but found " + peek().toString());
-            return;
+            return fail("expected a statement, found " + describeCurrent());
             }
     }
+    return Result<void>::Ok(); // TODO: Need to handle errors here
 }
 
 /**
@@ -594,19 +914,25 @@ void Parser::statement() {
 * CaseClauses -> (CaseClause ';')+
 * @return int: number of case clauses
 */
-int Parser::caseclauses() {
+Result<int> Parser::caseclauses() {
     LOG_DEBUG("Parsing case clauses");
-    // Parsing CaseClauses -> (CaseClause ';')+
-    caseclause(); // parse the case clause
+    // CaseClauses -> (CaseClause ';')+
+    auto result = caseclause();
+    if (result.isErr()) {
+        return Result<int>::ErrMsg(result.error_message.value_or("ParserError: parse error"));
+    }
     int n = 1;
     while (check(TokensType::Semicolon)) {
         advance(); // consume the semicolon
         if (check(TokensType::Key_end) || check(TokensType::Key_otherwise))
-            break; // if the end or otherwise keyword is found, break the loop
-        caseclause(); // parse the case clause
-        n++; // increment the number of case clauses
+            break; // empty trailing clause before 'end'/'otherwise'
+        result = caseclause();
+        if (result.isErr()) {
+            return Result<int>::ErrMsg(result.error_message.value_or("ParserError: parse error"));
+        }
+        n++;
     }
-    return n; // TODO: Need to handle errors here
+    return Result<int>::Ok(n);
 }
 
 /**
@@ -615,19 +941,31 @@ int Parser::caseclauses() {
 * CaseClause -> CaseExpression list ',' ':' Statement
 * @return void
 */
-void Parser::caseclause() {
+Result<void> Parser::caseclause() {
     LOG_DEBUG("Parsing case clause");
-    caseexpression();
+    auto result = caseexpression();
+    if (result.isErr()) {
+        return result;
+    }
     int n = 1;
     while(check(TokensType::Comma)) {
         advance(); // consume the comma
-        caseexpression();
-        n++; // increment the number of case expressions
+        result = caseexpression();
+        if (result.isErr()) {
+            return result;
+        }
+        n++;
     }
-    consume(TokensType::Colon, "colon");
-    statement();
+    result = consume(TokensType::Colon, "colon");
+    if (result.isErr()) {
+        return result;
+    }
+    result = statement();
+    if (result.isErr()) {
+        return result;
+    }
     buildTree("case_clause", n+1, peek().line, peek().column);
-    return; // TODO: Need to handle errors here
+    return Result<void>::Ok();
 }
 /**
 * @brief Parses the case expression.
@@ -636,19 +974,23 @@ void Parser::caseclause() {
 * CaseExpression -> ConstValue '..' ConstValue
 * @return void
 */
-void Parser::caseexpression() {
+Result<void> Parser::caseexpression() {
     LOG_DEBUG("Parsing case expression");
-    // Since both case expression and const value start with a const value, parse the const value
-    // Parsing CaseExpression -> ConstValue
-    constValue();
-    // Check if the case expression is followed by a double dot
+    // CaseExpression -> ConstValue
+    auto result = constValue();
+    if (result.isErr()) {
+        return result;
+    }
+    // CaseExpression -> ConstValue '..' ConstValue
     if(check(TokensType::Dots)) {
-        // Parsing CaseExpression -> ConstValue '..' ConstValue
         advance(); // consume the double dot
-        constValue();
+        result = constValue();
+        if (result.isErr()) {
+            return result;
+        }
         buildTree("..", 2);
-    } 
-    return; // TODO: Need to handle errors here
+    }
+    return Result<void>::Ok();
 }
 
 /**
@@ -657,12 +999,19 @@ void Parser::caseexpression() {
 * OtherwiseClause -> 'otherwise' Expression
 * @return void
 */
-void Parser::otherwiseclause() {
+Result<void> Parser::otherwiseclause() {
     if (!check(TokensType::Key_otherwise))
-        return;  // ε — push nothing
-    consume(TokensType::Key_otherwise, "otherwise");
-    statement();
+        return Result<void>::Ok();  // ε — push nothing
+    auto result = consume(TokensType::Key_otherwise, "otherwise");
+    if (result.isErr()) {
+        return result;
+    }
+    result = statement();
+    if (result.isErr()) {
+        return result;
+    }
     buildTree("otherwise", 1);
+    return Result<void>::Ok();
 }
 
 
@@ -673,17 +1022,19 @@ void Parser::otherwiseclause() {
 * ForStatment -> 
 * @return void
 */
-void Parser::forstatement() {
+Result<void> Parser::forstatement() {
     LOG_DEBUG("Parsing for statement");
-    // Check if the for statement is empty
+    // ForStatement -> <null>
     if(!check(TokensType::Identifier)) {
-        // Parsing ForStatement -> <null>
         push(new TreeNode("<null>", peek().line, peek().column));
-        return; // TODO: Need to handle errors here
+        return Result<void>::Ok();
     }
-    // Parsing ForStatement -> Assignment
-    assignment();
-    return; // TODO: Need to handle errors here
+    // ForStatement -> Assignment
+    auto result = assignment();
+    if (result.isErr()) {
+        return result;
+    }
+    return Result<void>::Ok();
 }
 
 /**
@@ -693,15 +1044,18 @@ void Parser::forstatement() {
 * ForExpression ->
 * @return void
 */
-void Parser::forexpression() {
-    // check if the for expression is empty
+Result<void> Parser::forexpression() {
+    // ForExpression -> <null>
     if (check(TokensType::Semicolon)) {
-        // Parsing ForExpression -> <null>
         push(new TreeNode("true", peek().line, peek().column));
-        return;
+        return Result<void>::Ok();
     }
-    // Parsing ForExpression -> Expression
-    expression();
+    // ForExpression -> Expression
+    auto result = expression();
+    if (result.isErr()) {
+        return result;
+    }
+    return Result<void>::Ok();
 }
 
 /**
@@ -711,17 +1065,23 @@ void Parser::forexpression() {
 * Assignment -> Identifier ':=:' Identifier
 * @return void
 */
-void Parser::assignment() {
+Result<void> Parser::assignment() {
     LOG_DEBUG("Parsing assignment");
     // Parsing Identifier since both assignment and swap start with an identifier
-    identifier();
+    auto result = identifier();
+    if (result.isErr()) {
+        return result;
+    }
 
     switch (peek().type) {
         // Parsing Assignment -> Identifier ':=' Expression
         case TokensType::Assignment:
             {
                 advance(); // consume the assignment keyword
-                expression(); // parse the expression
+                result = expression();
+                if (result.isErr()) {
+                    return result;
+                }
                 buildTree("assign", 2, peek().line, peek().column);
                 break;
             }
@@ -729,17 +1089,19 @@ void Parser::assignment() {
         case TokensType::Swap:
             {
                 advance(); // consume the swap keyword
-                identifier(); // parse the identifier
+                result = identifier();
+                if (result.isErr()) {
+                    return result;
+                }
                 buildTree("swap", 2, peek().line, peek().column);
                 break;
             }
         default:
             {
-                LOG_ERROR("Expected identifier but found " + peek().toString());
-                return;
+                return fail("expected ':=' or ':=:', found " + describeCurrent());
             }
     }
-    return; // TODO: Need to handle errors here
+    return Result<void>::Ok();
 }
 
 /**
@@ -754,11 +1116,13 @@ void Parser::assignment() {
 * Expression -> Term '<>' Term
 * @return void
 */
-void Parser::expression() {
+Result<void> Parser::expression() {
     LOG_DEBUG("Parsing expression");
-    // Parsing Expression -> Term
-    // Parse term since all expressions start with a term
-    term();
+    // Expression -> Term
+    auto result = term();
+    if (result.isErr()) {
+        return result;
+    }
     while (
         check(TokensType::LessThanEqual) ||
         check(TokensType::LessThan) ||
@@ -768,7 +1132,10 @@ void Parser::expression() {
         check(TokensType::NotEqual)
     ) {
         Token token = advance(); // get relational operator
-        term(); // parse the term
+        result = term();
+        if (result.isErr()) {
+            return result;
+        }
         switch (token.type) {
             // Parsing Expression -> Term '<=' Term
             case TokensType::LessThanEqual:
@@ -795,11 +1162,10 @@ void Parser::expression() {
                 buildTree("<>", 2, peek().line, peek().column); 
                 break;
             default:
-                LOG_ERROR("Expected relational operator but found " + token.toString());
-                return; // TODO: Need to handle errors here
+                return fail("expected a relational operator, found " + describeCurrent());
         }
     }
-    return; // TODO: Need to handle errors here
+    return Result<void>::Ok();
 }
 
 /**
@@ -811,10 +1177,13 @@ void Parser::expression() {
 * Term -> Term 'or' Factor
 * @return void
 */
-void Parser::term() {
+Result<void> Parser::term() {
     LOG_DEBUG("Parsing term");
-    // Parsing Term -> Factor
-    factor();
+    // Term -> Factor
+    auto result = factor();
+    if (result.isErr()) {
+        return result;
+    }
     while(
         check(TokensType::Plus) ||
         check(TokensType::Minus) ||
@@ -822,7 +1191,10 @@ void Parser::term() {
     )
     {
         Token token = advance(); // get arithmetic operator
-        factor(); // parse the factor
+        result = factor();
+        if (result.isErr()) {
+            return result;
+        }
         // Parsing Term -> Term '+' Factor
         if (token.type == TokensType::Plus) {
             buildTree("+", 2, peek().line, peek().column);
@@ -836,11 +1208,10 @@ void Parser::term() {
             buildTree("or", 2, peek().line, peek().column);
         } 
         else {
-            LOG_ERROR("Expected plus, minus, or or but found " + token.toString());
-            return; // TODO: Need to handle errors here
+            return fail("expected '+', '-', or 'or', found " + describeCurrent());
         }
     }
-    return; // TODO: Need to handle errors here
+    return Result<void>::Ok();
 }
 
 /**
@@ -853,11 +1224,13 @@ void Parser::term() {
 * Factor -> Primary
 * @return void
 */
-void Parser::factor() {
+Result<void> Parser::factor() {
     LOG_DEBUG("Parsing factor");
-    // Parsing Factor -> Primary
-    primary(); // parse the primary
-
+    // Factor -> Primary
+    auto result = primary();
+    if (result.isErr()) {
+        return result;
+    }
     while (
         check(TokensType::Multiply) || 
         check(TokensType::Divide) || 
@@ -874,14 +1247,16 @@ void Parser::factor() {
         // Parsing Factor -> Factor 'mod' Primary
         else if (check(TokensType::Modulus)) op = "mod";
         else {
-            LOG_ERROR("Expected multiply, divide, and, or, or modulus but found " + peek().toString());
-            return; // TODO: Need to handle errors here
+            return fail("expected '*', '/', 'and', or 'mod', found " + describeCurrent());
         }
         advance(); // consume the operator keyword
-        primary(); // parse the primary
+        result = primary();
+        if (result.isErr()) {
+            return result;
+        }
         buildTree(op, 2, peek().line, peek().column);
     }
-    return; // TODO: Need to handle errors here
+    return Result<void>::Ok();
 }
 
 /**
@@ -902,26 +1277,35 @@ void Parser::factor() {
 * Primary -> 'ord' '(' Expression ')'
 * @return void
 */
-void Parser::primary() {
+Result<void> Parser::primary() {
+    Result<void> result;
     switch (peek().type) {
         // Parsing Primary -> '-' Primary
         case TokensType::Minus: {
             advance(); // consume the minus keyword
-            primary(); // parse the primary
+            result = primary();
+            if (result.isErr()) {
+                return result;
+            }
             buildTree("-", 1, peek().line, peek().column);
             break;
         }
         // Parsing Primary -> '+' Primary
         case TokensType::Plus: {
             advance(); // consume the plus keyword
-            primary(); // parse the primary
-            // buildTree("+", 1);
+            result = primary();
+            if (result.isErr()) {
+                return result;
+            }
             break;
         }
         // Parsing Primary -> 'not' Primary
         case TokensType::Not: {
             advance(); // consume the not keyword
-            primary();
+            result = primary();
+            if (result.isErr()) {
+                return result;
+            }
             buildTree("not", 1, peek().line, peek().column);
             break;
         }
@@ -936,20 +1320,30 @@ void Parser::primary() {
         // Parsing Primary -> Identifier '(' Expression list ',' ')'
         case TokensType::Identifier:
         {
-            identifier(); // parse the identifier
-            // Check if the identifier is followed by a open parenthesis
+            result = identifier();
+            if (result.isErr()) {
+                return result;
+            }
+            // Primary -> Identifier '(' Expression list ',' ')'
             if (check(TokensType::OpenParen)) {
-                // Parsing Primary -> Identifier '(' Expression list ',' ')'
-                advance(); // consume the open parenthesis keyword
+                advance(); // consume the open parenthesis
                 int n = 1;
-                expression(); // parse the expression
-                // Check if the expression is followed by a comma
-                while(check(TokensType::Comma)) {
-                    advance(); // consume the comma keyword
-                    expression(); // parse the expression
-                    n++; // increment the number of expressions
+                result = expression();
+                if (result.isErr()) {
+                    return result;
                 }
-                consume(TokensType::CloseParen, "close parenthesis");
+                while(check(TokensType::Comma)) {
+                    advance(); // consume the comma
+                    result = expression();
+                    if (result.isErr()) {
+                        return result;
+                    }
+                    n++;
+                }
+                result = consume(TokensType::CloseParen, "close parenthesis");
+                if (result.isErr()) {
+                    return result;
+                }
                 buildTree("call", n+1, peek().line, peek().column); // n+1 because the function name is also included
             }
             break;
@@ -957,30 +1351,51 @@ void Parser::primary() {
         // Parsing Primary -> IntegerLiteral
         case TokensType::IntegerLiteral:
         {
-            integerLiteral(); // parse the integer literal
+            result = integerLiteral();
+            if (result.isErr()) {
+                return result;
+            }
             break;
         }
         // Parsing Primary -> CharLiteral
         case TokensType::CharLiteral:
         {
-            charLiteral(); // parse the char literal
+            result = charLiteral();
+            if (result.isErr()) {
+                return result;
+            }
             break;
         }
         // Parsing Primary -> '(' Expression ')'
         case TokensType::OpenParen:
         {
             advance(); // consume the open parenthesis keyword
-            expression(); // parse the expression
-            consume(TokensType::CloseParen, "close parenthesis");
+            result = expression();
+            if (result.isErr()) {
+                return result;
+            }
+            result = consume(TokensType::CloseParen, "close parenthesis");
+            if (result.isErr()) {
+                return result;
+            }
             break;
         }
         // Parsing Primary -> 'succ' '(' Expression ')'
         case TokensType::Key_succ:
         {
             advance(); // consume the succ keyword
-            consume(TokensType::OpenParen, "open parenthesis");
-            expression(); // parse the expression
-            consume(TokensType::CloseParen, "close parenthesis");
+            result = consume(TokensType::OpenParen, "open parenthesis");
+            if (result.isErr()) {
+                return result;
+            }
+            result = expression();
+            if (result.isErr()) {
+                return result;
+            }
+            result = consume(TokensType::CloseParen, "close parenthesis");
+            if (result.isErr()) {
+                return result;
+            }
             buildTree("succ", 1, peek().line, peek().column);
             break;
         }
@@ -988,9 +1403,18 @@ void Parser::primary() {
         case TokensType::Key_pred:
         {
             advance(); // consume the pred keyword
-            consume(TokensType::OpenParen, "open parenthesis");
-            expression(); // parse the expression
-            consume(TokensType::CloseParen, "close parenthesis"); // consume the close parenthesis keyword
+            result = consume(TokensType::OpenParen, "open parenthesis");
+            if (result.isErr()) {
+                return result;
+            }
+            result = expression();
+            if (result.isErr()) {
+                return result;
+            }
+            result = consume(TokensType::CloseParen, "close parenthesis");
+            if (result.isErr()) {
+                return result;
+            }
             buildTree("pred", 1, peek().line, peek().column);
             break;
         }
@@ -998,9 +1422,18 @@ void Parser::primary() {
         case TokensType::Key_chr:
         {
             advance(); // consume the chr keyword
-            consume(TokensType::OpenParen, "open parenthesis");
-            expression(); // parse the expression
-            consume(TokensType::CloseParen, "close parenthesis");
+            result = consume(TokensType::OpenParen, "open parenthesis");
+            if (result.isErr()) {
+                return result;
+            }
+            result = expression();
+            if (result.isErr()) {
+                return result;
+            }
+            result = consume(TokensType::CloseParen, "close parenthesis");
+            if (result.isErr()) {
+                return result;
+            }
             buildTree("chr", 1, peek().line, peek().column);
             break;
         }
@@ -1008,16 +1441,25 @@ void Parser::primary() {
         case TokensType::Key_ord:
         {
             advance(); // consume the ord keyword
-            consume(TokensType::OpenParen, "open parenthesis");
-            expression(); // parse the expression
-            consume(TokensType::CloseParen, "close parenthesis");
+            result = consume(TokensType::OpenParen, "open parenthesis");
+            if (result.isErr()) {
+                return result;
+            }
+            result = expression();
+            if (result.isErr()) {
+                return result;
+            }
+            result = consume(TokensType::CloseParen, "close parenthesis");
+            if (result.isErr()) {
+                return result;
+            }
             buildTree("ord", 1, peek().line, peek().column);
             break;
         }
         default:
-            LOG_ERROR("expected primary expression, got " + peek().toString());
-            return;
+            return fail("expected an expression, found " + describeCurrent());
     }
+    return Result<void>::Ok();
 }
 
 /**
@@ -1027,16 +1469,23 @@ void Parser::primary() {
 * OutExp -> Expression
 * @return void
 */
-void Parser::outexp() {
+Result<void> Parser::outexp() {
     if (check(TokensType::String)) {
-        // OutExp -> StringNode => "string"
-        stringLiteral();
-        buildTree("string", 1, peek().line, peek().column); // build the tree for the output expression
+        // OutExp -> StringLiteral
+        auto result = stringLiteral();
+        if (result.isErr()) {
+            return result;
+        }
+        buildTree("string", 1, peek().line, peek().column);
     } else {
-        // Parsing OutExp -> Expression
-        expression();  // parse the expression
-        buildTree("integer", 1, peek().line, peek().column);  // build the tree for the output expression
+        // OutExp -> Expression
+        auto result = expression();
+        if (result.isErr()) {
+            return result;
+        }
+        buildTree("integer", 1, peek().line, peek().column);
     }
+    return Result<void>::Ok();
 }
 
 /**
@@ -1045,15 +1494,19 @@ void Parser::outexp() {
 * StringLiteral -> '<string>' 
 * @return void
 */
-void Parser::stringLiteral() {
+Result<void> Parser::stringLiteral() {
     LOG_DEBUG("Parsing string literal");
-    // Parsing StringLiteral -> '<string>'
-    Token token = consume(TokensType::String, "string literal");
+    // StringLiteral -> '<string>'
+    Token token = peek();
+    auto result = consume(TokensType::String, "string literal");
+    if (result.isErr()) {
+        return result;
+    }
     TreeNode* node = new TreeNode("<string>", token.line, token.column);
     TreeNode* child = new TreeNode(token.lexeme, token.line, token.column);
     node->left = child;
     push(node);
-    return; // TODO: Need to handle errors here
+    return Result<void>::Ok();
 }
 
 /**
@@ -1062,15 +1515,19 @@ void Parser::stringLiteral() {
 * IntegerLiteral -> '<integer>'
 * @return void
 */
-void Parser::integerLiteral() {
+Result<void> Parser::integerLiteral() {
     LOG_DEBUG("Parsing integer literal");
-    // Parsing IntegerLiteral -> '<integer>'
-    Token token = consume(TokensType::IntegerLiteral, "integer literal");
+    // IntegerLiteral -> '<integer>'
+    Token token = peek();
+    auto result = consume(TokensType::IntegerLiteral, "integer literal");
+    if (result.isErr()) {
+        return result;
+    }
     TreeNode* node = new TreeNode("<integer>", token.line, token.column);
     TreeNode* child = new TreeNode(token.lexeme, token.line, token.column);
     node->left = child;
     push(node);
-    return; // TODO: Need to handle errors here
+    return Result<void>::Ok();
 }
 
 /**
@@ -1079,10 +1536,14 @@ void Parser::integerLiteral() {
 * CharLiteral -> '<char>'
 * @return void
 */
-void Parser::charLiteral() {
+Result<void> Parser::charLiteral() {
     LOG_DEBUG("Parsing char literal");
-    // Parsing CharLiteral -> '<char>'
-    Token token = consume(TokensType::CharLiteral, "char literal");
+    // CharLiteral -> '<char>'
+    Token token = peek();
+    auto result = consume(TokensType::CharLiteral, "char literal");
+    if (result.isErr()) {
+        return result;
+    }
     TreeNode* node = new TreeNode("<char>", token.line, token.column);
     std::string label = token.lexeme;
     if (label.length() == 1) {
@@ -1091,7 +1552,7 @@ void Parser::charLiteral() {
     TreeNode* child = new TreeNode(label, token.line, token.column);
     node->left = child;
     push(node);
-    return; // TODO: Need to handle errors here
+    return Result<void>::Ok();
 }
 
 
@@ -1102,20 +1563,51 @@ void Parser::charLiteral() {
 * WinZig -> 'program' Identifier ':' Consts Types Dclns Subprogs Body Identifier '.'
 * @return void
 */
-void Parser::winzig() {
+Result<void> Parser::winzig() {
     LOG_DEBUG("Parsing WinZigC program");
-    consume(TokensType::Key_program, "program"); // consume the program keyword
-    identifier(); // parse the identifier
-    consume(TokensType::Colon, "colon");
-    consts(); // parse the consts
-    types(); // parse the types
-    dclns(); // parse the declarations
-    subprogs(); // parse the subprograms
-    body(); // parse the body
-    identifier(); // parse the identifier
-    consume(TokensType::SingleDot, "single dot");
-    buildTree("program", 7, peek().line, peek().column); // Build the tree for the WinZigC program
-    return; // TODO: Update the implementation
+    // WinZig -> 'program' Identifier ':' Consts Types Dclns Subprogs Body Identifier '.'
+    auto result = consume(TokensType::Key_program, "program");
+    if (result.isErr()) {
+        return result;
+    }
+    result = identifier();
+    if (result.isErr()) {
+        return result;
+    }
+    result = consume(TokensType::Colon, "colon");
+    if (result.isErr()) {
+        return result;
+    }
+    result = consts();
+    if (result.isErr()) {
+        return result;
+    }
+    result = types();
+    if (result.isErr()) {
+        return result;
+    }
+    result = dclns();
+    if (result.isErr()) {
+        return result;
+    }
+    result = subprogs();
+    if (result.isErr()) {
+        return result;
+    }
+    result = body();
+    if (result.isErr()) {
+        return result;
+    }
+    result = identifier();
+    if (result.isErr()) {
+        return result;
+    }
+    result = consume(TokensType::SingleDot, "single dot");
+    if (result.isErr()) {
+        return result;
+    }
+    buildTree("program", 7, peek().line, peek().column);
+    return Result<void>::Ok();
 }
 
 

@@ -106,7 +106,7 @@ TEST_F(ParserEdgeTest, ParseReturnsErrorWhenExtraTokensRemain) {
     auto tree = Parser(tokens.value.value()).parseTree();
     EXPECT_FALSE(tree.success);
     ASSERT_TRUE(tree.error_message.has_value());
-    EXPECT_NE(tree.error_message->find("Expected end of file"), std::string::npos);
+    EXPECT_NE(tree.error_message->find("end of file"), std::string::npos);
 
     auto parsed = Parser(tokens.value.value()).parse(false);
     EXPECT_FALSE(parsed.success);
