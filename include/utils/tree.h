@@ -7,9 +7,14 @@ struct TreeNode {
     std::string value;
     TreeNode* left;
     TreeNode* right;
+    int line = -1; // Optional: store line number for error reporting
+    int column = -1; // Optional: store column number for error reporting
 
     explicit TreeNode(std::string value, TreeNode* left = nullptr, TreeNode* right = nullptr)
         : value(std::move(value)), left(left), right(right) {}
+
+    TreeNode(std::string value, int line, int column, TreeNode* left = nullptr, TreeNode* right = nullptr)
+        : value(std::move(value)), left(left), right(right), line(line), column(column) {}
 
     ~TreeNode() {
         delete left;

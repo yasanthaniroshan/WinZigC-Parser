@@ -115,12 +115,14 @@ add_executable(tests
     tests/unit/test_result.cpp
     tests/unit/test_logger.cpp
     tests/unit/test_parser_edges.cpp
+    tests/unit/test_analyzer.cpp
+    tests/unit/test_symbol_table.cpp
 )
 target_compile_definitions(tests PRIVATE
     TEST_GRAMMAR_DIR="${CMAKE_SOURCE_DIR}/tests/grammar"
     TEST_INTEGRATION_DIR="${CMAKE_SOURCE_DIR}/tests/integration"
 )
-target_link_libraries(tests PRIVATE gtest_main utils parser)
+target_link_libraries(tests PRIVATE gtest_main utils parser semantic_analyzer)
 
 include(GoogleTest)
 gtest_discover_tests(tests)
@@ -129,7 +131,7 @@ gtest_discover_tests(tests)
 option(ENABLE_COVERAGE "Enable coverage" OFF)
 
 if(ENABLE_COVERAGE)
-    set(_coverage_targets winzigc utils winzig_log tree tokenizer parser tests)
+    set(_coverage_targets winzigc utils winzig_log tree tokenizer parser semantic_analyzer code_generator tests)
     foreach(tgt IN LISTS _coverage_targets)
         target_compile_options(${tgt} PRIVATE --coverage)
         target_link_options(${tgt} PRIVATE --coverage)

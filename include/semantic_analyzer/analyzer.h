@@ -2,10 +2,14 @@
 #define SEMANTIC_ANALYZER_H
 
 #include <iostream>
+#include <string>
+#include <unordered_map>
+#include <vector>
 #include <queue> 
 #include "common/result.h"
 #include "common/error.h"
 #include "utils/logger.h"
+#include "utils/diagnostics.h"
 #include "utils/tree.h"
 #include "tokenizer/tokenizer.h"
 #include "semantic_analyzer/symbol.h"
@@ -18,6 +22,17 @@ enum class SemanticType {
     UserDefined,
     Unknown
 };
+
+struct SemanticError : public Error {
+    std::string msg;
+    int line;
+    int column;
+    SemanticError(std::string m, int l = -1, int c = -1) : msg(std::move(m)), line(l), column(c) {}
+    std::string message() const override {
+        std::string locationInfo = (line >= 0 && column >= 0) ? " at line " + std::to_string(line) + ", column " + std::to_string(column) : "";
+        return "SemanticError: " + msg + locationInfo;
+    }
+};
 class SemanticAnalyzer {
 public:
     SemanticAnalyzer(TreeNode* ast);
@@ -25,9 +40,23 @@ public:
     SymbolTable getSymbolTable() const { return symbolTable; }
     Result<void> analyze();
 
+    // Collected semantic errors from the most recent analyze() call.
+    const std::vector<SemanticError>& getErrors() const { return errors; }
+
 private:
     TreeNode* ast; // The abstract syntax tree to analyze.
     SymbolTable symbolTable; // The symbol table for semantic analysis.
+    std::vector<SemanticError> errors; // A list to store semantic errors encountered during analysis.
+
+    // Tracks the function whose body is currently being analyzed so that
+    // `return` statements can be checked against its declared return type.
+    bool inFunction = false;
+    SemanticType currentReturnType = SemanticType::Unknown;
+    std::string currentFunctionName;
+
+    // Records a semantic error, tagging it with the source position of `node`
+    // (line/column default to -1 when `node` is null or carries no position).
+    void addError(const std::string& message, TreeNode* node);
 
     void analyzeProgram(TreeNode* node);
 
@@ -56,7 +85,6 @@ private:
     
     
     
-    SemanticType analyzeReturnType(TreeNode* node);
     SemanticType analyzeExpression(TreeNode* node);
     SemanticType analyzeTerm(TreeNode* node);
     SemanticType analyzeFactor(TreeNode* node);
@@ -65,9 +93,6 @@ private:
 
 
     SemanticType analyzeCall(TreeNode* node);
-
-    SemanticType findReturnNodes(TreeNode *node);
-
 
     void analyzeAssign(TreeNode* node);
     int countChildren(TreeNode* node);

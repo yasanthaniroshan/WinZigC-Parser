@@ -100,7 +100,7 @@ void Parser::consts() {
     // Check for actually are there any consts in the program
     if(!check(TokensType::Key_const)) {
         // If there are no consts in the program, push a consts node to the stack
-        push(new TreeNode("consts"));
+        push(new TreeNode("consts", peek().line, peek().column));
         return; 
     }
     // If there any consts in this program, parse the consts
@@ -113,7 +113,7 @@ void Parser::consts() {
         constDeclaration(); // parse the const declaration
         n++; // increment the number of const declarations
     }
-    buildTree("consts", n); // Build the tree for the consts statement
+    buildTree("consts", n, peek().line, peek().column); // Build the tree for the consts statement
     consume(TokensType::Semicolon, "semicolon"); // consume the semicolon
     return; // TODO: Need to handle errors here
 }
@@ -130,7 +130,7 @@ void Parser::constDeclaration() {
     identifier();
     consume(TokensType::Equal, "equal"); // consume the equal sign
     constValue();
-    buildTree("const", 2); // Build the tree for the const declaration
+    buildTree("const", 2, peek().line, peek().column); // Build the tree for the const declaration
     return; // TODO: Need to handle errors here
 }
 /**
@@ -176,8 +176,8 @@ void Parser::identifier() {
     if(check(TokensType::Identifier)) {
         Token token = advance();
         LOG_DEBUG("Identifier found: " + token.toString());
-        TreeNode* node = new TreeNode("<identifier>");
-        TreeNode* child = new TreeNode(token.lexeme);
+        TreeNode* node = new TreeNode("<identifier>", token.line, token.column);
+        TreeNode* child = new TreeNode(token.lexeme, token.line, token.column);
         node->left = child;
         push(node);
         return; // TODO: Need to handle errors here
@@ -199,7 +199,7 @@ void Parser::types() {
     if(!check(TokensType::Key_type)) {
         // If there are no types in the program, push a types node to the stack
         // Parsing types -> 
-        push(new TreeNode("types")); 
+        push(new TreeNode("types", peek().line, peek().column)); 
         return; // TODO: Need to handle errors here
     }
     // If there are types in the program, parse the types
@@ -210,7 +210,7 @@ void Parser::types() {
         typeDeclaration(); // parse the type declaration
         n++; // increment the number of type declarations
     } while (check(TokensType::Identifier));
-    buildTree("types", n); // Build the tree for the types statement
+    buildTree("types", n, peek().line, peek().column); // Build the tree for the types statement
     return; // TODO: Need to handle errors here
 }
 
@@ -226,7 +226,7 @@ void Parser::typeDeclaration() {
     consume(TokensType::Equal, "equal");
     litlist();
     consume(TokensType::Semicolon, "semicolon");
-    buildTree("type", 2);
+    buildTree("type", 2, peek().line, peek().column);
     return; // TODO: Need to handle errors here
 }
 
@@ -247,7 +247,7 @@ void Parser::litlist() {
         n++; // increment the number of identifiers
     }
     consume(TokensType::CloseParen, "close parenthesis"); // consume the close parenthesis
-    buildTree("lit", n);
+    buildTree("lit", n, peek().line, peek().column);
     return; // TODO: Need to handle errors here
 }
 /** 
@@ -263,7 +263,7 @@ void Parser::subprogs() {
     if(!check(TokensType::Key_function)) {
         // If there are no subprograms in the program, push a subprogs node to the stack
         // Parsing subprogs -> 
-        push(new TreeNode("subprogs"));
+        push(new TreeNode("subprogs", peek().line, peek().column));
         return; // TODO: Need to handle errors here
     }
     // If there are subprograms in the program, parse the subprograms
@@ -277,7 +277,7 @@ void Parser::subprogs() {
         fcn(); // parse the function declaration
         n++; // increment the number of function declarations
     }
-    buildTree("subprogs", n); // Build the tree for the subprograms statement
+    buildTree("subprogs", n, peek().line, peek().column); // Build the tree for the subprograms statement
     return; // TODO: Need to handle errors here
 }
 
@@ -304,7 +304,7 @@ void Parser::fcn() {
     body();
     identifier();
     consume(TokensType::Semicolon, "semicolon");
-    buildTree("fcn", 8);
+    buildTree("fcn", 8, peek().line, peek().column);
     return; // TODO: Need to handle errors here
 }
 
@@ -324,7 +324,7 @@ void Parser::params() {
         dcln(); // parse the dcln
         n++; // increment the number of dcln
     }
-    buildTree("params", n); // Build the tree for the params statement
+    buildTree("params", n, peek().line, peek().column); // Build the tree for the params statement
     return; // TODO: Need to handle errors here
 }
 
@@ -345,7 +345,7 @@ void Parser::dcln() {
     }
     consume(TokensType::Colon, "colon");
     identifier();
-    buildTree("var", n+1);
+    buildTree("var", n+1, peek().line, peek().column);
     return; // TODO: Need to handle errors here
 }
 
@@ -362,7 +362,7 @@ void Parser::dclns() {
     if(!check(TokensType::Key_var)) {
         // If there are no declarations in the program, push a dclns node to the stack
         // Parsing dclns -> 
-        push(new TreeNode("dclns"));
+        push(new TreeNode("dclns", peek().line, peek().column));
         return; // TODO: Need to handle errors here
     }
     // If there are declarations in the program, parse the declarations
@@ -373,7 +373,7 @@ void Parser::dclns() {
         consume(TokensType::Semicolon, "semicolon");
         n++; // increment the number of dcln
     } while (check(TokensType::Identifier));
-    buildTree("dclns", n); // Build the tree for the dclns statement
+    buildTree("dclns", n, peek().line, peek().column); // Build the tree for the dclns statement
     return; // TODO: Need to handle errors here
 }
 
@@ -391,7 +391,7 @@ void Parser::body() {
         // If the body is empty, push a block node to the stack
         // Parsing body -> 'begin' 'end'
         consume(TokensType::Key_end, "end"); // consume the end keyword
-        buildTree("block", 0);
+        buildTree("block", 0, peek().line, peek().column);
         return; // TODO: Need to handle errors here
     }
     // If the body is not empty, parse the body
@@ -404,7 +404,7 @@ void Parser::body() {
         n++; // increment the number of statements
     }
     consume(TokensType::Key_end, "end"); // consume the end keyword
-    buildTree("block", n); // Build the tree for the block statement
+    buildTree("block", n, peek().line, peek().column); // Build the tree for the block statement
     return; // TODO: Need to handle errors here
 } 
 /**
@@ -431,7 +431,7 @@ void Parser::statement() {
     if (!(check(TokensType::Identifier) || check(TokensType::Key_output) || check(TokensType::Key_if) || check(TokensType::Key_while) || check(TokensType::Key_repeat) || check(TokensType::Key_for) || check(TokensType::Key_loop) || check(TokensType::Key_case) || check(TokensType::Key_read) || check(TokensType::Key_exit) || check(TokensType::Key_return) || check(TokensType::Key_begin))) {
         // If the statement is empty, push a null node to the stack
         // Parsing statement -> <null>
-        push(new TreeNode("<null>"));
+        push(new TreeNode("<null>", peek().line, peek().column));
         return; // TODO: Need to handle errors here
     }
     switch (peek().type) {
@@ -454,7 +454,7 @@ void Parser::statement() {
                     n++; // increment the number of output expressions
                 }
                 consume(TokensType::CloseParen, "close parenthesis");
-                buildTree("output",n);
+                buildTree("output", n, peek().line, peek().column);
                 break;
             }
         // Parsing statement -> 'if' Expression 'then' Statement ('else' Statement)?
@@ -467,9 +467,9 @@ void Parser::statement() {
                 if(check(TokensType::Key_else)) {
                     advance(); // consume the else keyword
                     statement();
-                    buildTree("if", 3);
+                    buildTree("if", 3, peek().line, peek().column);
                 } else {
-                    buildTree("if", 2);
+                    buildTree("if", 2, peek().line, peek().column);
                 }
                 break;
             }
@@ -480,7 +480,7 @@ void Parser::statement() {
                 expression(); // parse the expression
                 consume(TokensType::Key_do, "do"); // consume the do keyword
                 statement();
-                buildTree("while", 2);
+                buildTree("while", 2, peek().line, peek().column);
                 break;
             }
         // Parsing statement -> 'repeat' Statement list ';' 'until' Expression
@@ -496,7 +496,7 @@ void Parser::statement() {
                 }
                 consume(TokensType::Key_until, "until"); // consume the until keyword
                 expression();
-                buildTree("repeat", n + 1);
+                buildTree("repeat", n + 1, peek().line, peek().column);
                 break;
             }
         // Parsing statement -> 'for' '(' ForStatement ';' ForExpression ';' ForStatement ')' Statement
@@ -511,7 +511,7 @@ void Parser::statement() {
                 forstatement();
                 consume(TokensType::CloseParen, "close parenthesis");
                 statement();
-                buildTree("for", 4);
+                buildTree("for", 4, peek().line, peek().column);
                 break;
             }
         // Parsing statement -> 'loop' Statement list ';' 'pool'
@@ -526,7 +526,7 @@ void Parser::statement() {
                     n++; // increment the number of statements
                 }
                 consume(TokensType::Key_pool, "pool");
-                buildTree("loop",n);
+                buildTree("loop",n, peek().line, peek().column);
                 break;
             }
         // Parsing statement -> 'case' Expression 'of' CaseClauses 'otherwise' CaseExpression 'end'
@@ -540,7 +540,7 @@ void Parser::statement() {
                 hasOtherwise = check(TokensType::Key_otherwise);
                 otherwiseclause(); // parse the otherwise clause
                 consume(TokensType::Key_end, "end");
-                buildTree("case", 1 + nClauses + (hasOtherwise ? 1 : 0));
+                buildTree("case", 1 + nClauses + (hasOtherwise ? 1 : 0), peek().line, peek().column);
                 break;
             }
         // Parsing statement -> 'read' '(' Identifier list ',' ')'
@@ -556,14 +556,14 @@ void Parser::statement() {
                     n++; // increment the number of identifiers
                 }
                 consume(TokensType::CloseParen, "close parenthesis");
-                buildTree("read", n);
+                buildTree("read", n, peek().line, peek().column);
                 break;
             }
         // Parsing statement -> 'exit'
         case TokensType::Key_exit:
             {
                 consume(TokensType::Key_exit, "exit"); // consume the exit keyword
-                buildTree("exit", 0);
+                buildTree("exit", 0, peek().line, peek().column);
                 break;
             }
         // Parsing statement -> 'return' Expression
@@ -571,7 +571,7 @@ void Parser::statement() {
             {
                 consume(TokensType::Key_return, "return"); // consume the return keyword
                 expression(); // parse the expression
-                buildTree("return", 1);
+                buildTree("return", 1, peek().line, peek().column);
                 break;
             }
         // Parsing statement -> Body
@@ -626,7 +626,7 @@ void Parser::caseclause() {
     }
     consume(TokensType::Colon, "colon");
     statement();
-    buildTree("case_clause", n+1);
+    buildTree("case_clause", n+1, peek().line, peek().column);
     return; // TODO: Need to handle errors here
 }
 /**
@@ -678,7 +678,7 @@ void Parser::forstatement() {
     // Check if the for statement is empty
     if(!check(TokensType::Identifier)) {
         // Parsing ForStatement -> <null>
-        push(new TreeNode("<null>"));
+        push(new TreeNode("<null>", peek().line, peek().column));
         return; // TODO: Need to handle errors here
     }
     // Parsing ForStatement -> Assignment
@@ -697,7 +697,7 @@ void Parser::forexpression() {
     // check if the for expression is empty
     if (check(TokensType::Semicolon)) {
         // Parsing ForExpression -> <null>
-        push(new TreeNode("true"));
+        push(new TreeNode("true", peek().line, peek().column));
         return;
     }
     // Parsing ForExpression -> Expression
@@ -722,7 +722,7 @@ void Parser::assignment() {
             {
                 advance(); // consume the assignment keyword
                 expression(); // parse the expression
-                buildTree("assign", 2);
+                buildTree("assign", 2, peek().line, peek().column);
                 break;
             }
         // Parsing Assignment -> Identifier ':=:' Identifier
@@ -730,7 +730,7 @@ void Parser::assignment() {
             {
                 advance(); // consume the swap keyword
                 identifier(); // parse the identifier
-                buildTree("swap", 2);
+                buildTree("swap", 2, peek().line, peek().column);
                 break;
             }
         default:
@@ -772,27 +772,27 @@ void Parser::expression() {
         switch (token.type) {
             // Parsing Expression -> Term '<=' Term
             case TokensType::LessThanEqual:
-                buildTree("<=", 2); 
+                buildTree("<=", 2, peek().line, peek().column); 
                 break;
             // Parsing Expression -> Term '<' Term
             case TokensType::LessThan:
-                buildTree("<", 2);
+                buildTree("<", 2, peek().line, peek().column);
                 break;
             // Parsing Expression -> Term '>=' Term
             case TokensType::GreaterThanEqual:
-                buildTree(">=", 2);
+                buildTree(">=", 2, peek().line, peek().column);
                 break;
             // Parsing Expression -> Term '>' Term
             case TokensType::GreaterThan:
-                buildTree(">", 2);
+                buildTree(">", 2, peek().line, peek().column);
                 break;
             // Parsing Expression -> Term '=' Term
             case TokensType::Equal:
-                buildTree("=", 2);
+                buildTree("=", 2, peek().line, peek().column);
                 break;
             // Parsing Expression -> Term '<>' Term
             case TokensType::NotEqual:
-                buildTree("<>", 2); 
+                buildTree("<>", 2, peek().line, peek().column); 
                 break;
             default:
                 LOG_ERROR("Expected relational operator but found " + token.toString());
@@ -825,15 +825,15 @@ void Parser::term() {
         factor(); // parse the factor
         // Parsing Term -> Term '+' Factor
         if (token.type == TokensType::Plus) {
-            buildTree("+", 2);
+            buildTree("+", 2, peek().line, peek().column);
         } 
         // Parsing Term -> Term '-' Factor
         else if (token.type == TokensType::Minus) {
-            buildTree("-", 2);
+            buildTree("-", 2, peek().line, peek().column);
         } 
         // Parsing Term -> Term 'or' Factor
         else if (token.type == TokensType::Or) {
-            buildTree("or", 2);
+            buildTree("or", 2, peek().line, peek().column);
         } 
         else {
             LOG_ERROR("Expected plus, minus, or or but found " + token.toString());
@@ -879,7 +879,7 @@ void Parser::factor() {
         }
         advance(); // consume the operator keyword
         primary(); // parse the primary
-        buildTree(op, 2);
+        buildTree(op, 2, peek().line, peek().column);
     }
     return; // TODO: Need to handle errors here
 }
@@ -908,7 +908,7 @@ void Parser::primary() {
         case TokensType::Minus: {
             advance(); // consume the minus keyword
             primary(); // parse the primary
-            buildTree("-", 1);
+            buildTree("-", 1, peek().line, peek().column);
             break;
         }
         // Parsing Primary -> '+' Primary
@@ -922,14 +922,14 @@ void Parser::primary() {
         case TokensType::Not: {
             advance(); // consume the not keyword
             primary();
-            buildTree("not", 1);
+            buildTree("not", 1, peek().line, peek().column);
             break;
         }
         // Parsing Primary -> 'eof'
         case TokensType::Key_eof:
         {   
             advance(); // consume the eof keyword
-            push(new TreeNode("eof"));
+            push(new TreeNode("eof", peek().line, peek().column));
             break;
         }
         // Parsing Primary -> Identifier
@@ -950,7 +950,7 @@ void Parser::primary() {
                     n++; // increment the number of expressions
                 }
                 consume(TokensType::CloseParen, "close parenthesis");
-                buildTree("call", n+1); // n+1 because the function name is also included
+                buildTree("call", n+1, peek().line, peek().column); // n+1 because the function name is also included
             }
             break;
         }
@@ -981,7 +981,7 @@ void Parser::primary() {
             consume(TokensType::OpenParen, "open parenthesis");
             expression(); // parse the expression
             consume(TokensType::CloseParen, "close parenthesis");
-            buildTree("succ", 1);
+            buildTree("succ", 1, peek().line, peek().column);
             break;
         }
         // Parsing Primary -> 'pred' '(' Expression ')'
@@ -991,7 +991,7 @@ void Parser::primary() {
             consume(TokensType::OpenParen, "open parenthesis");
             expression(); // parse the expression
             consume(TokensType::CloseParen, "close parenthesis"); // consume the close parenthesis keyword
-            buildTree("pred", 1);
+            buildTree("pred", 1, peek().line, peek().column);
             break;
         }
         // Parsing Primary -> 'chr' '(' Expression ')'
@@ -1001,7 +1001,7 @@ void Parser::primary() {
             consume(TokensType::OpenParen, "open parenthesis");
             expression(); // parse the expression
             consume(TokensType::CloseParen, "close parenthesis");
-            buildTree("chr", 1);
+            buildTree("chr", 1, peek().line, peek().column);
             break;
         }
         // Parsing Primary -> 'ord' '(' Expression ')'
@@ -1011,7 +1011,7 @@ void Parser::primary() {
             consume(TokensType::OpenParen, "open parenthesis");
             expression(); // parse the expression
             consume(TokensType::CloseParen, "close parenthesis");
-            buildTree("ord", 1);
+            buildTree("ord", 1, peek().line, peek().column);
             break;
         }
         default:
@@ -1031,11 +1031,11 @@ void Parser::outexp() {
     if (check(TokensType::String)) {
         // OutExp -> StringNode => "string"
         stringLiteral();
-        buildTree("string", 1);
+        buildTree("string", 1, peek().line, peek().column); // build the tree for the output expression
     } else {
         // Parsing OutExp -> Expression
         expression();  // parse the expression
-        buildTree("integer", 1);  // build the tree for the output expression
+        buildTree("integer", 1, peek().line, peek().column);  // build the tree for the output expression
     }
 }
 
@@ -1049,8 +1049,8 @@ void Parser::stringLiteral() {
     LOG_DEBUG("Parsing string literal");
     // Parsing StringLiteral -> '<string>'
     Token token = consume(TokensType::String, "string literal");
-    TreeNode* node = new TreeNode("<string>");
-    TreeNode* child = new TreeNode(token.lexeme);
+    TreeNode* node = new TreeNode("<string>", token.line, token.column);
+    TreeNode* child = new TreeNode(token.lexeme, token.line, token.column);
     node->left = child;
     push(node);
     return; // TODO: Need to handle errors here
@@ -1066,8 +1066,8 @@ void Parser::integerLiteral() {
     LOG_DEBUG("Parsing integer literal");
     // Parsing IntegerLiteral -> '<integer>'
     Token token = consume(TokensType::IntegerLiteral, "integer literal");
-    TreeNode* node = new TreeNode("<integer>");
-    TreeNode* child = new TreeNode(token.lexeme);
+    TreeNode* node = new TreeNode("<integer>", token.line, token.column);
+    TreeNode* child = new TreeNode(token.lexeme, token.line, token.column);
     node->left = child;
     push(node);
     return; // TODO: Need to handle errors here
@@ -1083,12 +1083,12 @@ void Parser::charLiteral() {
     LOG_DEBUG("Parsing char literal");
     // Parsing CharLiteral -> '<char>'
     Token token = consume(TokensType::CharLiteral, "char literal");
-    TreeNode* node = new TreeNode("<char>");
+    TreeNode* node = new TreeNode("<char>", token.line, token.column);
     std::string label = token.lexeme;
     if (label.length() == 1) {
         label = "'" + label + "'";
     }
-    TreeNode* child = new TreeNode(label);
+    TreeNode* child = new TreeNode(label, token.line, token.column);
     node->left = child;
     push(node);
     return; // TODO: Need to handle errors here
@@ -1114,7 +1114,7 @@ void Parser::winzig() {
     body(); // parse the body
     identifier(); // parse the identifier
     consume(TokensType::SingleDot, "single dot");
-    buildTree("program", 7); // Build the tree for the WinZigC program
+    buildTree("program", 7, peek().line, peek().column); // Build the tree for the WinZigC program
     return; // TODO: Update the implementation
 }
 
@@ -1139,7 +1139,7 @@ TreeNode* Parser::pop() {
 
 
 // Build the tree.
-void Parser::buildTree(std::string x, int n) {
+void Parser::buildTree(std::string x, int n,int line, int column) {
     TreeNode* parent = nullptr;
     for (int i = 0; i < n; i++) {
         TreeNode* child = pop();
@@ -1150,6 +1150,6 @@ void Parser::buildTree(std::string x, int n) {
         child->right = parent;
         parent = child;
     }
-    push(new TreeNode(std::move(x), parent, nullptr));
+    push(new TreeNode(std::move(x), line, column, parent, nullptr));
 }
 
