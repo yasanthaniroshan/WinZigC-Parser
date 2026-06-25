@@ -68,6 +68,12 @@ class StackMachine:
 
     def push(self, value):
         self.top += 1
+        if self.top >= len(self.stack):
+            # Out of stack slots: almost always unbounded or too-deep recursion.
+            # Raise a clear message instead of a bare IndexError from the list.
+            raise RuntimeError(
+                "Stack overflow: exceeded {} stack slots "
+                "(too-deep or unbounded recursion?)".format(len(self.stack)))
         self.stack[self.top] = value
 
     def pop(self):
@@ -268,4 +274,10 @@ if __name__ == "__main__":
             args = " ".join(parts[1:]) if len(parts) > 1 else None
             program.append((op, args))
     machine = StackMachine(program)
-    machine.run()
+    try:
+        machine.run()
+    except (RuntimeError, ZeroDivisionError) as e:
+        # Report runtime faults (stack overflow, bad PC, division by zero, ...)
+        # as a clean one-line message rather than a Python traceback.
+        print("Runtime error: {}".format(e), file=sys.stderr)
+        sys.exit(1)
