@@ -7,7 +7,9 @@
 #include <vector>
 
 enum class SymbolKind { Variable, Constant, Type, Function };
-enum class SymbolType { Integer, Char, String, Boolean, UserDefined };
+// `Void` is a function return type meaning "returns nothing" (procedure-like).
+// Kept last so the existing enumerators keep their values.
+enum class SymbolType { Integer, Char, String, Boolean, UserDefined, Void };
 
 inline std::string symbolKindToString(SymbolKind kind) {
     switch (kind) {
@@ -25,6 +27,7 @@ inline std::string symbolTypeToString(SymbolType type) {
         case SymbolType::String: return "String";
         case SymbolType::Boolean: return "Boolean";
         case SymbolType::UserDefined: return "UserDefined";
+        case SymbolType::Void: return "Void";
         default: return "Unknown";
     }
 }
@@ -54,6 +57,7 @@ struct Symbol {
         if (type == "char") return SymbolType::Char;
         if (type == "string") return SymbolType::String;
         if (type == "boolean") return SymbolType::Boolean;
+        if (type == "void") return SymbolType::Void;
         return SymbolType::UserDefined;
     }
 

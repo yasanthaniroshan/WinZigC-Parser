@@ -12,6 +12,7 @@ std::string semanticTypeToString(SemanticType type)
         case SemanticType::Boolean:     return "boolean";
         case SemanticType::UserDefined: return "user-defined";
         case SemanticType::Unknown:     return "unknown";
+        case SemanticType::Void:        return "void";
     }
     return "unknown";
 }
@@ -44,10 +45,27 @@ void SemanticAnalyzer::addError(const std::string &message, TreeNode *node)
     errors.push_back(SemanticError(message, line, column));
 }
 
+void SemanticAnalyzer::addWarning(const std::string &message, TreeNode *node)
+{
+    int line = node ? node->line : -1;
+    int column = node ? node->column : -1;
+    warnings.push_back(SemanticWarning(message, line, column));
+}
+
 Result<void> SemanticAnalyzer::analyze()
 {
     analyzeProgram(ast);
     // symbolTable.printAllScopes(); // Print all scopes for debugging
+    // Warnings are non-fatal: report them but don't fail analysis. Printed before
+    // the (fatal) error block so they still surface when errors are also present.
+    if (!warnings.empty())
+    {
+        std::cerr << "\n";
+        for (const auto &warning : warnings)
+        {
+            diagnostics::warning(warning.msg, warning.line, warning.column);
+        }
+    }
     if (!errors.empty())
     {
         std::cerr << "\n";
@@ -329,9 +347,11 @@ void SemanticAnalyzer::analyzeFcn(TreeNode *node)
     bool savedInFunction = inFunction;
     SemanticType savedReturnType = currentReturnType;
     std::string savedFunctionName = currentFunctionName;
+    bool savedReturnsValue = currentFunctionReturnsValue;
     inFunction = true;
     currentReturnType = getSemanticTypeFromSymbolType(funcSymbol.type);
     currentFunctionName = funcSymbol.name;
+    currentFunctionReturnsValue = false;
 
     analyzeParams(paramsNode);
     analyzeConsts(constsNode);
@@ -339,9 +359,20 @@ void SemanticAnalyzer::analyzeFcn(TreeNode *node)
     analyzeDclns(dclnsNode);
     analyzeBody(bodyNode);
 
+    // A function declares a return type but never returns a value: it behaves like
+    // a procedure. Warn (don't error) and suggest declaring it 'void' instead.
+    if (currentReturnType != SemanticType::Void && !currentFunctionReturnsValue)
+    {
+        addWarning("Function '" + funcSymbol.name + "' declares return type '" +
+                       semanticTypeToString(currentReturnType) +
+                       "' but never returns a value; consider declaring it 'void'.",
+                   identifierNode->left);
+    }
+
     inFunction = savedInFunction;
     currentReturnType = savedReturnType;
     currentFunctionName = savedFunctionName;
+    currentFunctionReturnsValue = savedReturnsValue;
     symbolTable.exitScope(); // Leave the function scope
 
     LOG_DEBUG("Declared function '" + funcSymbol.name + "' with return type '" + symbolTypeToString(funcSymbol.type) + "' and " + std::to_string(funcSymbol.paramCount) + " parameters.");
@@ -579,9 +610,17 @@ void SemanticAnalyzer::analyzeStatement(TreeNode *node)
         {
             LOG_DEBUG("Analyzing return statement with expression.");
             SemanticType returnedType = analyzeExpression(current);
+            currentFunctionReturnsValue = true;
+            if (inFunction && currentReturnType == SemanticType::Void)
+            {
+                // Returning a value from a void function: harmless but pointless.
+                addWarning("Function '" + currentFunctionName +
+                               "' is declared 'void' but returns a value; the value is ignored.",
+                           node);
+            }
             // Inside a function, the returned value must match the declared return type. Comparing every return against the same declared type also forces all returns in the function to agree with one another.
-            if (inFunction && returnedType != SemanticType::Unknown &&
-                returnedType != currentReturnType)
+            else if (inFunction && returnedType != SemanticType::Unknown &&
+                     returnedType != currentReturnType)
             {
                 addError("Return type mismatch in function '" + currentFunctionName +
                              "'. Expected '" + semanticTypeToString(currentReturnType) +
@@ -591,7 +630,11 @@ void SemanticAnalyzer::analyzeStatement(TreeNode *node)
         }
         else
         {
-            addError("Return statement has no expression.", node);
+            // A bare `return` is valid in a void function; otherwise it must carry a value.
+            if (!inFunction || currentReturnType != SemanticType::Void)
+            {
+                addError("Return statement has no expression.", node);
+            }
         }
     }
     else if (node->value == "<null>")
