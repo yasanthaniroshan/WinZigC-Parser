@@ -1,0 +1,23 @@
+program binomial:
+# Read pairs (n k); print C(n, k). Stops when n <= 0.
+var n, k : integer;
+function comb(n, k : integer):integer;
+var i, num, den : integer;
+begin
+  if k > n - k then k := n - k;
+  num := 1; den := 1; i := 0;
+  while i < k do begin
+    num := num * (n - i);
+    den := den * (i + 1);
+    i := i + 1;
+  end;
+  return (num / den);
+end comb;
+begin
+  read(n);
+  while n > 0 do begin
+    read(k);
+    output(comb(n, k));
+    read(n);
+  end;
+end binomial.

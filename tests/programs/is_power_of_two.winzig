@@ -1,0 +1,15 @@
+program is_power_of_two:
+# 1 if a power of two
+var x : integer;
+function f(n:integer):integer;
+begin
+  while n mod 2 = 0 do n := n / 2;
+  if n = 1 then return (1) else return (0);
+end f;
+begin
+  read(x);
+  while x > 0 do begin
+    output(f(x));
+    read(x);
+  end;
+end is_power_of_two.

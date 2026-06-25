@@ -1,0 +1,13 @@
+program min_of_n:
+var count, i, x, best : integer;
+begin
+  read(count);
+  read(best);
+  i := 1;
+  while i < count do begin
+    read(x);
+    if x < best then best := x;
+    i := i + 1;
+  end;
+  output(best);
+end min_of_n.

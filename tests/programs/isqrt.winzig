@@ -1,0 +1,17 @@
+program isqrt:
+# floor of the square root
+var x : integer;
+function f(n:integer):integer;
+var i : integer;
+begin
+  i := 0;
+  while (i + 1) * (i + 1) <= n do i := i + 1;
+  return (i);
+end f;
+begin
+  read(x);
+  while x > 0 do begin
+    output(f(x));
+    read(x);
+  end;
+end isqrt.

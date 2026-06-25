@@ -1,0 +1,14 @@
+program triangular:
+# n-th triangular number
+var x : integer;
+function f(n:integer):integer;
+begin
+  return (n * (n + 1) / 2);
+end f;
+begin
+  read(x);
+  while x > 0 do begin
+    output(f(x));
+    read(x);
+  end;
+end triangular.

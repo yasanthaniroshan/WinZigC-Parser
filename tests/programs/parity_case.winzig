@@ -1,0 +1,16 @@
+program parity_case:
+# Print 10 for even numbers and 20 for odd numbers, via a case statement.
+var x, r : integer;
+begin
+  read(x);
+  while x > 0 do begin
+    r := x mod 2;
+    case r of
+      0: output(10);
+      1: output(20);
+    otherwise
+      output(99)
+    end;
+    read(x);
+  end;
+end parity_case.

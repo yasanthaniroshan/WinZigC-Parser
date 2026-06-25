@@ -1,0 +1,17 @@
+program global_write:
+
+# A function assigns a (non-shadowed) global; the absolute write must persist
+# after the frame is torn down on return.
+
+var g : integer;
+
+function setg(a:integer):integer;
+begin
+    g := a + 100;
+    return (0);
+end setg;
+
+begin
+    x := setg(5);
+    output(g);
+end global_write.

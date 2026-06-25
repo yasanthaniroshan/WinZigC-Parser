@@ -66,6 +66,7 @@ public:
     void reenterScope(int index); // re-enter an existing scope (for later passes, e.g. code generation)
     void exitScope();             // return to the parent scope; scopes are never destroyed
     int currentScopeIndex() const { return currentScope; }
+    int scopeLocalCount(int index) const; // number of variable slots reserved in a scope (params + locals)
     bool declare(const Symbol& sym);   // false if already declared in current scope
     Symbol* lookup(const std::string& name);  // walks up scopes, nullptr if not found
     void printCurrentScope(); // For debugging purposes

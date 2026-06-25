@@ -1,0 +1,20 @@
+program power:
+var b, e : integer;
+function power(b, e : integer):integer;
+var half : integer;
+begin
+  if e = 0 then return (1);
+  if e mod 2 = 0 then begin
+    half := power(b, e / 2);
+    return (half * half);
+  end
+  else return (b * power(b, e - 1));
+end power;
+begin
+  read(b);
+  while b > 0 do begin
+    read(e);
+    output(power(b, e));
+    read(b);
+  end;
+end power.

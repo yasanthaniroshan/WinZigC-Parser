@@ -1,0 +1,23 @@
+program primes:
+# For each number read (until a non-positive sentinel), print 1 if prime else 0.
+var x : integer;
+function isprime(n:integer):integer;
+var i : integer;
+    prime : boolean;
+begin
+  if n < 2 then return (0);
+  prime := true;
+  i := 2;
+  while (i * i <= n) and prime do begin
+    if n mod i = 0 then prime := false;
+    i := i + 1;
+  end;
+  if prime then return (1) else return (0);
+end isprime;
+begin
+  read(x);
+  while x > 0 do begin
+    output(isprime(x));
+    read(x);
+  end;
+end primes.

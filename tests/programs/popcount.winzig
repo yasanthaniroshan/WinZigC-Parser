@@ -1,0 +1,20 @@
+program popcount:
+# count of set bits (base-2 ones)
+var x : integer;
+function f(n:integer):integer;
+var c : integer;
+begin
+  c := 0;
+  while n > 0 do begin
+    c := c + n mod 2;
+    n := n / 2;
+  end;
+  return (c);
+end f;
+begin
+  read(x);
+  while x > 0 do begin
+    output(f(x));
+    read(x);
+  end;
+end popcount.

@@ -1,0 +1,14 @@
+program factorial_rec:
+var x : integer;
+function fact(n:integer):integer;
+begin
+  if n <= 1 then return (1)
+  else return (n * fact(n - 1));
+end fact;
+begin
+  read(x);
+  while x >= 0 do begin
+    output(fact(x));
+    read(x);
+  end;
+end factorial_rec.

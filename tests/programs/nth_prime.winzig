@@ -1,0 +1,26 @@
+program nth_prime:
+# the n-th prime number
+var x : integer;
+function f(n:integer):integer;
+var count, x, i : integer;
+    prime : boolean;
+begin
+  count := 0; x := 1;
+  while count < n do begin
+    x := x + 1;
+    prime := true; i := 2;
+    while (i * i <= x) and prime do begin
+      if x mod i = 0 then prime := false;
+      i := i + 1;
+    end;
+    if prime then count := count + 1;
+  end;
+  return (x);
+end f;
+begin
+  read(x);
+  while x > 0 do begin
+    output(f(x));
+    read(x);
+  end;
+end nth_prime.

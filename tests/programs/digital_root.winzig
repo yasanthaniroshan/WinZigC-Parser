@@ -1,0 +1,23 @@
+program digital_root:
+# repeated digit sum until single digit
+var x : integer;
+function f(n:integer):integer;
+var s : integer;
+begin
+  while n >= 10 do begin
+    s := 0;
+    while n > 0 do begin
+      s := s + n mod 10;
+      n := n / 10;
+    end;
+    n := s;
+  end;
+  return (n);
+end f;
+begin
+  read(x);
+  while x > 0 do begin
+    output(f(x));
+    read(x);
+  end;
+end digital_root.

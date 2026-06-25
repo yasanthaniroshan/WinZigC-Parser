@@ -92,7 +92,7 @@ int main(int argc, char** argv) {
         LOG_ERROR(optimizationResult.error_message.value());
         return 1;
     }
-    auto codeGenerator = CodeGenerator(optimizationResult.value.value(), semanticAnalyzer.getSymbolTable());
+    auto codeGenerator = CodeGenerator(optimizationResult.value.value(), semanticAnalyzer.getSymbolTable(), result.outputFile);
     auto codeGenerationResult = codeGenerator.generate();
     if (!codeGenerationResult.success) {
         LOG_ERROR(codeGenerationResult.error_message.value());
