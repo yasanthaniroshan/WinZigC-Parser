@@ -389,7 +389,7 @@ void SemanticAnalyzer::analyzeStatement(TreeNode *node)
 {
     if (node->value == "output")
     {
-        analyzeOutputStatement(node->left); // Since rule exsists go to next level in the tree
+        analyzeOutputStatement(node); // pass the 'output' node;
     }
     else if (node->value == "if")
     {
@@ -579,9 +579,7 @@ void SemanticAnalyzer::analyzeStatement(TreeNode *node)
         {
             LOG_DEBUG("Analyzing return statement with expression.");
             SemanticType returnedType = analyzeExpression(current);
-            // Inside a function, the returned value must match the declared return
-            // type. Comparing every return against the same declared type also
-            // forces all returns in the function to agree with one another.
+            // Inside a function, the returned value must match the declared return type. Comparing every return against the same declared type also forces all returns in the function to agree with one another.
             if (inFunction && returnedType != SemanticType::Unknown &&
                 returnedType != currentReturnType)
             {
@@ -665,37 +663,23 @@ void SemanticAnalyzer::analyzeAssignment(TreeNode *node)
 
 void SemanticAnalyzer::analyzeOutputStatement(TreeNode *node)
 {
-    TreeNode *current = node->left; // First child is the expression to output
-    int childCount = 0;
-    TreeNode *temp = current;
-    while (temp != nullptr)
-    {
-        childCount++;
-        temp = temp->right; // Move to the next sibling
-    }
-    LOG_DEBUG("Child count for output statement: " + std::to_string(childCount));
-    LOG_DEBUG("Child count for output statement: " + std::to_string(countChildren(node->left)));
+    LOG_DEBUG("Child count for output statement: " + std::to_string(countChildren(node)));
 
-    for (int i = 0; i < childCount; i++)
+    for (TreeNode *current = node->left; current != nullptr; current = current->right)
     {
-        // Handle Leave Nodes
-        LOG_DEBUG("Analyzing output statement.");
         if (current->value == "string")
         {
-            LOG_DEBUG("Output statement with string literal: " + current->left->value);
-            return;
+            LOG_DEBUG("Output statement with string literal.");
+            continue;
         }
-        else
+
+        LOG_DEBUG("Output statement with expression.");
+        TreeNode *exprNode = (current->value == "integer") ? current->left : current;
+        SemanticType exprType = analyzeExpression(exprNode);
+        if (exprType != SemanticType::Integer && exprType != SemanticType::Char)
         {
-            LOG_DEBUG("Output statement with expression.");
-            SemanticType exprType = analyzeExpression(current);
-            if (exprType != SemanticType::Integer && exprType != SemanticType::Char)
-            {
-                addError("Output statement expects an integer or character expression.", current);
-                return;
-            }
+            addError("Output statement expects an integer or character expression.", current);
         }
-        current = current->right; // Move to the next sibling
     }
 }
 void SemanticAnalyzer::analyzeForStatement(TreeNode *node)
@@ -875,6 +859,11 @@ SemanticType SemanticAnalyzer::analyzePrimary(TreeNode *node)
     // Handle Leave Nodes
     if (current->value == "-")
     {
+        // Since ast doesn't have parenthisis we should need to use expression to analyze the unary minus expression, because it can be a complex expression like -a + b or -func() etc.
+        if (current->left != nullptr && current->left->right != nullptr)
+        {
+            return analyzeExpression(current);
+        }
         TreeNode *operandNode = current->left; // The operand of the unary minus is the left child
         SemanticType operandType = analyzePrimary(operandNode);
         if (operandType == SemanticType::Integer)
@@ -983,9 +972,11 @@ SemanticType SemanticAnalyzer::analyzePrimary(TreeNode *node)
     //     LOG_DEBUG("Analyzing string literal: " + current->left->value);
     //     return SemanticType::String;
     // }
-    else if (current->value == "<=" || current->value == "<" || current->value == ">" || current->value == ">=" || current->value == "<>" || current->value == "=")
+    else if (current->value == "<=" || current->value == "<" || current->value == ">" || current->value == ">=" || current->value == "<>" || current->value == "=" ||
+             current->value == "+" || current->value == "or" ||
+             current->value == "*" || current->value == "/" || current->value == "and" || current->value == "mod")
     {
-        // A parenthesized relational expression appears where a primary is expected.
+        // A parenthesized sub-expression (relational, additive, multiplicative or logical) appears where a primary is expected, e.g. a * (b + c). Analyze it as a full expression so it routes back through term/factor handling.
         return analyzeExpression(current);
     }
     else
