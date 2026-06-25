@@ -12,6 +12,7 @@
 #include "parser/parser.h"
 #include "semantic_analyzer/analyzer.h"
 #include "code_generator/generator.h"
+#include "optimizer/optimizer.h"
 
 namespace {
 
@@ -85,7 +86,13 @@ int main(int argc, char** argv) {
         LOG_ERROR(semanticResult.error_message.value());
         return 1;
     }
-    auto codeGenerator = CodeGenerator(parserResult.value.value(), semanticAnalyzer.getSymbolTable(), result.outputFile);
+    auto optimizer = Optimizer(parserResult.value.value(), semanticAnalyzer.getSymbolTable(), result.optimizationLevel);
+    auto optimizationResult = optimizer.optimize();
+    if (!optimizationResult.success) {
+        LOG_ERROR(optimizationResult.error_message.value());
+        return 1;
+    }
+    auto codeGenerator = CodeGenerator(optimizationResult.value.value(), optimizer.getSymbolTable(), result.outputFile);
     auto codeGenerationResult = codeGenerator.generate();
     if (!codeGenerationResult.success) {
         LOG_ERROR(codeGenerationResult.error_message.value());

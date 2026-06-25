@@ -1,0 +1,16 @@
+program constant_fold:
+# Every assignment below starts from a pure constant expression that the
+# optimizer folds to a single literal (respecting * / before + -, and folding
+# to a fixpoint across passes). The printed results must be identical with or
+# without optimization.
+var a, b, c, d : integer;
+begin
+  a := 2 * 3 + 4;        # 6 + 4        -> 10
+  b := 100 - 7 * 9;      # 100 - 63     -> 37
+  c := 4 + 2 + 3 + 1;    # folded left-to-right across passes -> 10
+  d := (a + b) * 2;      # a,b are variables here -> computed at runtime = 94
+  output(a);
+  output(b);
+  output(c);
+  output(d);
+end constant_fold.

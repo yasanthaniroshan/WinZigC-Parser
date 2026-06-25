@@ -1,0 +1,18 @@
+program recursive_power:
+# Computes base^exp by recursion (exercises the frame-pointer calling
+# convention together with dead-local elimination). `deadL` is never used and
+# must be removed without disturbing the parameters x and n.
+var base, exp : integer;
+function pow(x, n : integer) : integer;
+var deadL : integer;
+begin
+  if n = 0 then
+    return (1)
+  else
+    return (x * pow(x, n - 1));
+end pow;
+begin
+  read(base);
+  read(exp);
+  output(pow(base, exp));
+end recursive_power.

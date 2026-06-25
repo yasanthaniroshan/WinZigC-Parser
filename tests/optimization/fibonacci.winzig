@@ -1,0 +1,29 @@
+program fibonacci:
+# Iterative Fibonacci for each input k (until a negative value). Mixes dead
+# variables at both scopes:
+#   - `junk` is a dead global
+#   - `tmp2` is a dead local
+# and keeps several live locals (a, b, next, i) whose frame slots must compact
+# correctly once `tmp2` is removed.
+var k, junk : integer;
+function fib(n : integer) : integer;
+var a, b, next, i, tmp2 : integer;
+begin
+  a := 0;
+  b := 1;
+  i := 0;
+  while i < n do begin
+    next := a + b;
+    a := b;
+    b := next;
+    i := i + 1;
+  end;
+  return (a);
+end fib;
+begin
+  read(k);
+  while k >= 0 do begin
+    output(fib(k));
+    read(k);
+  end;
+end fibonacci.

@@ -2,6 +2,26 @@
 #define TREE_H
 
 #include <string>
+#include <vector>
+#include <queue>
+#include <utility>
+
+
+enum class TravellingMethod {
+    PRE_ORDER,
+    IN_ORDER,
+    POST_ORDER
+};
+
+enum class TreeTraversalDirection {
+    LEFT,
+    RIGHT
+};
+
+enum class SearchMethod {
+    DEPTH_FIRST,
+    BREADTH_FIRST
+};
 
 struct TreeNode {
     std::string value;
@@ -28,5 +48,37 @@ struct TreeNode {
 int countChildren(TreeNode* node);
 void printTree(TreeNode* node, int depth);
 std::string treeToString(TreeNode* node, int depth = 0);
+
+class TreeTraveler {
+    private:
+        TreeNode* root;
+        TreeNode* current;
+        std::string nodeValue;
+        TreeNode* pointer = nullptr;
+        TreeNode** pointerSlot = nullptr; // Address of the left/right field that points at `pointer`; null if `pointer` is the root.
+        SearchMethod searchMethod = SearchMethod::DEPTH_FIRST;
+        // Frontier entries are (node, address of the field that points to it), so a later swap() can
+        // relink that exact field. Persists across step() calls so the search can resume.
+        std::vector<std::pair<TreeNode*, TreeNode**>> dfsStack;
+        std::queue<std::pair<TreeNode*, TreeNode**>> bfsQueue;
+        bool started = false; // Whether the frontier has been seeded with the root yet.
+public:
+    explicit TreeTraveler(TreeNode* root) : root(root), current(root) {}
+    void setSubtreeRoot(TreeNode* newRoot) { root = newRoot; current = newRoot; reset(); }
+    void setNodeValue(const std::string& value) { nodeValue = value; }
+    void setSearchMethod(SearchMethod method) { searchMethod = method; }
+    // Rewind the traversal so the next step() re-seeds the frontier from the root.
+    // Required before reusing the same traveler for another pass (e.g. a different nodeValue).
+    void reset() {
+        current = root;
+        pointer = nullptr;
+        pointerSlot = nullptr;
+        dfsStack.clear();
+        bfsQueue = {};
+        started = false;
+    }
+    TreeNode* step();
+    bool swap(TreeNode* newNode);
+};
 
 #endif

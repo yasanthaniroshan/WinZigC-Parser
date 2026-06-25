@@ -136,6 +136,67 @@ TEST(SymbolTableTest, ScopeLocalCountTracksReservedSlots) {
     EXPECT_EQ(table.scopeLocalCount(999), 0);  // out-of-range is harmless
 }
 
+// removeGlobalVariable erases a scope-0 variable and compacts the addresses of
+// the remaining globals so they stay contiguous from 0.
+TEST(SymbolTableTest, RemoveGlobalVariableCompactsAddresses) {
+    SymbolTable table;
+    table.declare(makeVar("a", SymbolType::Integer));  // address 0
+    table.declare(makeVar("b", SymbolType::Integer));  // address 1
+    table.declare(makeVar("c", SymbolType::Integer));  // address 2
+
+    EXPECT_TRUE(table.removeGlobalVariable("b"));
+    EXPECT_EQ(table.lookup("b"), nullptr);
+
+    // a keeps 0; c compacts 2 -> 1. globalVariables() is sorted by address.
+    auto globals = table.globalVariables();
+    ASSERT_EQ(globals.size(), 2u);
+    EXPECT_EQ(globals[0].first, "a");
+    EXPECT_EQ(globals[0].second, 0);
+    EXPECT_EQ(globals[1].first, "c");
+    EXPECT_EQ(globals[1].second, 1);
+    EXPECT_EQ(table.scopeLocalCount(0), 2);  // slot count shrank from 3 to 2
+}
+
+TEST(SymbolTableTest, RemoveGlobalVariableRejectsUnknownAndNonVariable) {
+    SymbolTable table;
+    table.declare(makeVar("x", SymbolType::Integer));
+    EXPECT_FALSE(table.removeGlobalVariable("missing"));
+    // The predeclared boolean literals are constants, not variables.
+    EXPECT_FALSE(table.removeGlobalVariable("true"));
+}
+
+// removeLocalVariable reclaims a function-scope slot: variables addressed above
+// the removed one shift down, lower ones (incl. parameters) are untouched, and
+// the scope's reserved-slot count shrinks.
+TEST(SymbolTableTest, RemoveLocalVariableCompactsAndPreservesParams) {
+    SymbolTable table;
+    int fn = table.enterScope();
+    table.declare(makeVar("p", SymbolType::Integer));     // param -> 0
+    table.declare(makeVar("a", SymbolType::Integer));     // local -> 1
+    table.declare(makeVar("dead", SymbolType::Integer));  // local -> 2
+    table.declare(makeVar("b", SymbolType::Integer));     // local -> 3
+
+    EXPECT_TRUE(table.removeLocalVariable(fn, "dead"));
+    EXPECT_EQ(table.lookup("dead"), nullptr);
+
+    Symbol* p = table.lookup("p");
+    Symbol* a = table.lookup("a");
+    Symbol* b = table.lookup("b");
+    ASSERT_NE(p, nullptr);
+    ASSERT_NE(a, nullptr);
+    ASSERT_NE(b, nullptr);
+    EXPECT_EQ(p->address, 0);  // parameter preserved
+    EXPECT_EQ(a->address, 1);  // below removed: unchanged
+    EXPECT_EQ(b->address, 2);  // above removed: shifted 3 -> 2
+    EXPECT_EQ(table.scopeLocalCount(fn), 3);  // was 4
+}
+
+TEST(SymbolTableTest, RemoveLocalVariableRejectsBadScope) {
+    SymbolTable table;
+    EXPECT_FALSE(table.removeLocalVariable(999, "x"));
+    EXPECT_FALSE(table.removeLocalVariable(-1, "x"));
+}
+
 TEST(SymbolTableTest, PrintHelpersRunWithoutCrashing) {
     SymbolTable table;
     Symbol type("Color", SymbolType::UserDefined);

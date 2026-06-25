@@ -1,5 +1,10 @@
 program hello:
-var x:integer; y:char;
+var x:integer;y:boolean;
 begin
-  output("Hello World");
+  x := -10;
+  if x > 10 + 1 then
+    x := 10 + 3
+  else 
+    x := 10 - 3;
+
 end hello.

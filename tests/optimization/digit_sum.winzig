@@ -1,0 +1,24 @@
+program digit_sum:
+# Sum of the decimal digits of each input number (until a non-positive value).
+# Optimizer targets:
+#   - `unusedG` is a dead global  -> dropped from .data
+#   - `scratch` is a dead local   -> frame slot reclaimed
+# `total` and `x` are live and must keep working.
+var n, unusedG : integer;
+function digitSum(x : integer) : integer;
+var total, scratch : integer;
+begin
+  total := 0;
+  while x > 0 do begin
+    total := total + x mod 10;
+    x := x / 10;
+  end;
+  return (total);
+end digitSum;
+begin
+  read(n);
+  while n > 0 do begin
+    output(digitSum(n));
+    read(n);
+  end;
+end digit_sum.

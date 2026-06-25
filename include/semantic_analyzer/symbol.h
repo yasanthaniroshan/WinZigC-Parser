@@ -69,10 +69,13 @@ public:
     int currentScopeIndex() const { return currentScope; }
     int scopeLocalCount(int index) const; // number of variable slots reserved in a scope (params + locals)
     std::vector<std::pair<std::string, int>> globalVariables() const; // scope-0 variables (name, address), sorted by address
+    bool removeGlobalVariable(const std::string& name); // erase a scope-0 variable (dead-code elimination); false if absent. Compacts remaining globals' addresses.
+    bool removeLocalVariable(int scopeIndex, const std::string& name); // erase a variable from a function scope, compact higher local addresses down, and shrink the scope's slot count. Parameters (lowest addresses) are preserved.
     bool declare(const Symbol& sym);   // false if already declared in current scope
     Symbol* lookup(const std::string& name);  // walks up scopes, nullptr if not found
     void printCurrentScope(); // For debugging purposes
     void printAllScopes(); // For debugging purposes
+    std::vector<std::pair<Symbol, int>> getAllVariables(); // returns all variables in the current scope and its ancestors, along with their scope indices
 private:
     struct Scope {
         std::unordered_map<std::string, Symbol> symbols;
