@@ -36,7 +36,12 @@ void CodeGenerator::emitVarSave(const Symbol* sym) {
 Result<void> CodeGenerator::generate()
 {
     LOG_DEBUG("Starting code generation.");
-    generateProgram(ast, CodeInput(0, 1));
+    // Surface code-generation failures instead of silently writing whatever
+    // partial output was emitted so far (which produces broken assembly).
+    auto programResult = generateProgram(ast, CodeInput(0, 1));
+    if (!programResult.success) {
+        return Result<void>::ErrMsg(programResult.error_message.value_or("Code generation failed"));
+    }
     // printGeneratedCode();
     saveGeneratedCode();
     return Result<void>::Ok();
