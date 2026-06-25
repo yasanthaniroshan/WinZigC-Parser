@@ -3,6 +3,7 @@
 #include <iostream>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 enum class SymbolKind { Variable, Constant, Type, Function };
@@ -67,6 +68,7 @@ public:
     void exitScope();             // return to the parent scope; scopes are never destroyed
     int currentScopeIndex() const { return currentScope; }
     int scopeLocalCount(int index) const; // number of variable slots reserved in a scope (params + locals)
+    std::vector<std::pair<std::string, int>> globalVariables() const; // scope-0 variables (name, address), sorted by address
     bool declare(const Symbol& sym);   // false if already declared in current scope
     Symbol* lookup(const std::string& name);  // walks up scopes, nullptr if not found
     void printCurrentScope(); // For debugging purposes

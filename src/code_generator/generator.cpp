@@ -1,5 +1,8 @@
 #include "code_generator/generator.h"
 
+#include <sstream>
+#include <unordered_map>
+
 CodeGenerator::CodeGenerator(TreeNode *ast, SymbolTable symbolTable, std::string outputFile) : ast(ast), symbolTable(symbolTable), outputFile(outputFile)
 {
 }
@@ -30,6 +33,99 @@ void CodeGenerator::emitVarLoad(const Symbol* sym) {
 
 void CodeGenerator::emitVarSave(const Symbol* sym) {
     emit(sym->scopeIndex == 0 ? "save" : "save_local", sym->address);
+}
+
+// Split an instruction line "op operand..." into opcode and (possibly empty) operand.
+static std::string opcodeOf(const std::string& line) {
+    auto space = line.find(' ');
+    return space == std::string::npos ? line : line.substr(0, space);
+}
+static std::string operandOf(const std::string& line) {
+    auto space = line.find(' ');
+    return space == std::string::npos ? std::string() : line.substr(space + 1);
+}
+
+// Transform the flat, line-numbered instruction stream (`generatedCode`) into a
+// sectioned, labeled assembly file. The instruction set is unchanged; only the
+// surface form changes:
+//   - globals move to a .data section and are referenced by name (save/load)
+//   - string literals move to a .rodata section, referenced by .LC label (lits)
+//   - functions and branch targets become named labels; goto/iffalse/iftrue/call
+//     reference those labels instead of 1-based line numbers
+//   - the leading `goto <main>` is dropped; execution starts at the `main` label
+std::vector<std::string> CodeGenerator::assembleSectioned() const {
+    std::vector<std::string> out;
+    if (generatedCode.empty()) return out;
+
+    // address -> global name (for rewriting save/load operands)
+    std::unordered_map<int, std::string> addrToName;
+    auto globals = symbolTable.globalVariables();
+    for (const auto& g : globals) addrToName[g.second] = g.first;
+
+    auto isJumpOp = [](const std::string& op) {
+        return op == "goto" || op == "iffalse" || op == "iftrue" || op == "call";
+    };
+
+    // 1-based line -> label name. Function entries get their function name; the
+    // main body (target of the leading goto) gets "main"; other jump targets get
+    // a generated .L<n> label.
+    std::unordered_map<int, std::string> lineLabel;
+    for (const auto& fa : functionAddresses) lineLabel[fa.second] = fa.first;
+
+    int mainLine = std::stoi(operandOf(generatedCode[0])); // leading "goto <main>"
+    lineLabel[mainLine] = "main";
+
+    int labelCounter = 0;
+    for (const auto& line : generatedCode) {
+        if (isJumpOp(opcodeOf(line))) {
+            int target = std::stoi(operandOf(line));
+            if (!lineLabel.count(target)) lineLabel[target] = ".L" + std::to_string(labelCounter++);
+        }
+    }
+
+    // ---- .data : global variables ----
+    out.push_back(".data");
+    for (const auto& g : globals) out.push_back(g.first + ": 0");
+    out.push_back("");
+
+    // ---- .rodata : string literals ----
+    if (!stringLiterals.empty()) {
+        out.push_back(".rodata");
+        for (const auto& s : stringLiterals) out.push_back(s.first + ": \"" + s.second + "\"");
+        out.push_back("");
+    }
+
+    // ---- .text : code ----
+    out.push_back(".text");
+    out.push_back(".globl main");
+
+    // Skip index 0 (the leading goto); execution begins at the `main` label.
+    for (size_t i = 1; i < generatedCode.size(); ++i) {
+        int line = static_cast<int>(i) + 1;
+        auto labelIt = lineLabel.find(line);
+        if (labelIt != lineLabel.end()) {
+            out.push_back("");
+            out.push_back(labelIt->second + ":");
+        }
+
+        const std::string& instr = generatedCode[i];
+        std::string op = opcodeOf(instr);
+        std::string operand = operandOf(instr);
+
+        std::string rewritten;
+        if (isJumpOp(op)) {
+            rewritten = op + " " + lineLabel[std::stoi(operand)];
+        } else if (op == "save" || op == "load") {
+            rewritten = op + " " + addrToName[std::stoi(operand)];
+        } else if (operand.empty()) {
+            rewritten = op;
+        } else {
+            rewritten = op + " " + operand;
+        }
+        out.push_back("\t" + rewritten);
+    }
+
+    return out;
 }
 
 //===== Code generation =====
@@ -367,7 +463,11 @@ Result<CodeResult> CodeGenerator::generateString(TreeNode *node, CodeInput input
 
     CodeResult currentRes = CodeResult(input.stackPointer, input.nextInstruction);
 
-    emit("lits", stringValue);
+    // String literals live in the .rodata section under a generated label; the
+    // instruction references the label, e.g. `lits .LC0`.
+    std::string label = ".LC" + std::to_string(stringLiterals.size());
+    stringLiterals.push_back({label, stringValue});
+    emit("lits", label);
 
     currentRes.stackPointer++; // pushes literal on to the stack
     currentRes.nextInstruction++;
