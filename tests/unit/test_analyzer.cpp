@@ -27,10 +27,18 @@ struct Diagnostic {
 struct AnalysisOutcome {
     bool success = false;
     std::vector<Diagnostic> diagnostics;
+    std::vector<Diagnostic> warnings;
 
     bool containsMessage(const std::string& needle) const {
         for (const auto& d : diagnostics) {
             if (d.message.find(needle) != std::string::npos) return true;
+        }
+        return false;
+    }
+
+    bool containsWarning(const std::string& needle) const {
+        for (const auto& w : warnings) {
+            if (w.message.find(needle) != std::string::npos) return true;
         }
         return false;
     }
@@ -62,6 +70,9 @@ AnalysisOutcome analyzeSource(const std::string& source) {
     outcome.success = result.success;
     for (const auto& e : analyzer.getErrors()) {
         outcome.diagnostics.push_back({e.msg, e.line, e.column});
+    }
+    for (const auto& w : analyzer.getWarnings()) {
+        outcome.warnings.push_back({w.msg, w.line, w.column});
     }
 
     delete root;
@@ -568,4 +579,76 @@ end t.)";
     auto outcome = analyzeSource(source);
     EXPECT_FALSE(outcome.success);
     EXPECT_TRUE(outcome.containsMessage("Cannot infer user-defined type for identifier 'newp'"));
+}
+
+// --- void return type and the "non-void function never returns" warning -------
+
+// A function declares a value return type but its body never returns one: this
+// is a warning, not an error, and analysis still succeeds.
+TEST_F(SemanticAnalyzerTest, WarnsWhenNonVoidFunctionNeverReturnsValue) {
+    const std::string source = R"(program t:
+var g : integer;
+function f ( n : integer ) : integer;
+begin
+  g := n + 1
+end f;
+begin
+  g := 0;
+  output(g)
+end t.)";
+    auto outcome = analyzeSource(source);
+    EXPECT_TRUE(outcome.success);  // non-fatal
+    EXPECT_TRUE(outcome.containsWarning("never returns a value"));
+    EXPECT_TRUE(outcome.containsWarning("consider declaring it 'void'"));
+}
+
+// A function explicitly declared 'void' may omit a return entirely: no warning,
+// no error.
+TEST_F(SemanticAnalyzerTest, AcceptsVoidFunctionWithoutReturn) {
+    const std::string source = R"(program t:
+var g : integer;
+function f ( n : integer ) : void;
+begin
+  g := n + 1
+end f;
+begin
+  g := 0;
+  output(g)
+end t.)";
+    auto outcome = analyzeSource(source);
+    EXPECT_TRUE(outcome.success);
+    EXPECT_TRUE(outcome.warnings.empty());
+}
+
+// A 'void' function that returns a value is warned about (the value is ignored).
+// The function is declared but not called, so no call-site type error arises.
+TEST_F(SemanticAnalyzerTest, WarnsWhenVoidFunctionReturnsValue) {
+    const std::string source = R"(program t:
+function f ( n : integer ) : void;
+begin
+  return (n + 1)
+end f;
+begin
+  output(0)
+end t.)";
+    auto outcome = analyzeSource(source);
+    EXPECT_TRUE(outcome.success);
+    EXPECT_TRUE(outcome.containsWarning("declared 'void' but returns a value"));
+}
+
+// A well-formed value-returning function produces no warnings.
+TEST_F(SemanticAnalyzerTest, NoWarningWhenFunctionReturnsDeclaredType) {
+    const std::string source = R"(program t:
+var g : integer;
+function f ( n : integer ) : integer;
+begin
+  return (n + 1)
+end f;
+begin
+  g := f(5);
+  output(g)
+end t.)";
+    auto outcome = analyzeSource(source);
+    EXPECT_TRUE(outcome.success);
+    EXPECT_TRUE(outcome.warnings.empty());
 }

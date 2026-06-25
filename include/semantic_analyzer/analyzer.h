@@ -20,7 +20,8 @@ enum class SemanticType {
     String,
     Boolean,
     UserDefined,
-    Unknown
+    Unknown,
+    Void  // function return type meaning "returns nothing"
 };
 
 struct SemanticError : public Error {
@@ -33,6 +34,19 @@ struct SemanticError : public Error {
         return "SemanticError: " + msg + locationInfo;
     }
 };
+
+// A non-fatal diagnostic: analysis still succeeds. Kept as its own Error-derived
+// type (distinct from SemanticError) so warnings and errors never get conflated.
+struct SemanticWarning : public Error {
+    std::string msg;
+    int line;
+    int column;
+    SemanticWarning(std::string m, int l = -1, int c = -1) : msg(std::move(m)), line(l), column(c) {}
+    std::string message() const override {
+        std::string locationInfo = (line >= 0 && column >= 0) ? " at line " + std::to_string(line) + ", column " + std::to_string(column) : "";
+        return "SemanticWarning: " + msg + locationInfo;
+    }
+};
 class SemanticAnalyzer {
 public:
     SemanticAnalyzer(TreeNode* ast);
@@ -40,23 +54,30 @@ public:
     SymbolTable getSymbolTable() const { return symbolTable; }
     Result<void> analyze();
 
-    // Collected semantic errors from the most recent analyze() call.
+    // Collected semantic errors / warnings from the most recent analyze() call.
     const std::vector<SemanticError>& getErrors() const { return errors; }
+    const std::vector<SemanticWarning>& getWarnings() const { return warnings; }
 
 private:
     TreeNode* ast; // The abstract syntax tree to analyze.
     SymbolTable symbolTable; // The symbol table for semantic analysis.
     std::vector<SemanticError> errors; // A list to store semantic errors encountered during analysis.
+    std::vector<SemanticWarning> warnings; // Non-fatal diagnostics (e.g. a non-void function that never returns a value).
 
     // Tracks the function whose body is currently being analyzed so that
     // `return` statements can be checked against its declared return type.
     bool inFunction = false;
     SemanticType currentReturnType = SemanticType::Unknown;
     std::string currentFunctionName;
+    // Whether the function currently being analyzed returns a value anywhere in
+    // its body. Used to warn when a non-void function never returns one.
+    bool currentFunctionReturnsValue = false;
 
     // Records a semantic error, tagging it with the source position of `node`
     // (line/column default to -1 when `node` is null or carries no position).
     void addError(const std::string& message, TreeNode* node);
+    // Records a non-fatal warning (does not cause analysis to fail).
+    void addWarning(const std::string& message, TreeNode* node);
 
     void analyzeProgram(TreeNode* node);
 
@@ -107,6 +128,7 @@ private:
             case SymbolType::String: return SemanticType::String;
             case SymbolType::Boolean: return SemanticType::Boolean;
             case SymbolType::UserDefined: return SemanticType::UserDefined;
+            case SymbolType::Void: return SemanticType::Void;
             default: return SemanticType::Unknown;
         }
     }
@@ -118,6 +140,7 @@ private:
             case SemanticType::String: return SymbolType::String;
             case SemanticType::Boolean: return SymbolType::Boolean;
             case SemanticType::UserDefined: return SymbolType::UserDefined;
+            case SemanticType::Void: return SymbolType::Void;
             default: return SymbolType::UserDefined; // Default to UserDefined for unknown types
         }
     }
