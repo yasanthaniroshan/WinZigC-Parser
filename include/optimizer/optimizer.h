@@ -1,6 +1,9 @@
 #ifndef OPTIMIZER_H
 #define OPTIMIZER_H
 
+#include <string>
+#include <vector>
+#include <unordered_set>
 #include "common/result.h"
 #include "common/error.h"
 #include "utils/tree.h"
@@ -42,10 +45,9 @@ class Optimizer {
             }
         ~Optimizer() = default;
 
-        Result<TreeNode*> optimize();
+        Result<TreeNode*> preOptimize();
+        Result<void> postOptimize(std::vector<std::string>& asmLines);
 
-        // The symbol table after optimization (e.g. dead globals removed). Code generation
-        // must use THIS table, not the analyzer's, so removed variables drop out of .data.
         SymbolTable getSymbolTable() const { return symbolTable; }
 
     private:
@@ -62,19 +64,31 @@ class Optimizer {
         void addWarning(const std::string& message, int line = -1, int column = -1) {
             warnings.emplace_back(message, line, column);
         }
+
         Result<void> constantFoldingPass();
-        Result<void> removeMinusNode(TreeNode* node);
-        Result<void> removeConstantAddition(TreeNode* node);
-        Result<void> removeConstantSubtraction(TreeNode* node);
-        Result<void> removeConstantMultiplication(TreeNode* node);
-        Result<void> removeConstantDivision(TreeNode* node);
+        TreeNode* simplifyExpr(TreeNode* node);   // simplify a subtree, return its replacement
+        TreeNode* foldExprNode(TreeNode* node);   // fold/simplify one node (children already done)
+        TreeNode* makeIntNode(long value, TreeNode* at);
+        Result<void> propagateNamedConstants(TreeNode* body);
+        void replaceConstIdentifiers(TreeNode* parent);
 
-        Result<void> removeConstantModulus(TreeNode* node);
 
-        // A global is dead only if it is referenced in NEITHER the subprograms nor the body. Removes such globals from both the symbol table and the declaration list.
+        TreeNode* eliminateDeadBranches(TreeNode* node);
+        TreeNode* reduceBranch(TreeNode* node);
+        TreeNode* removeUnreachableCode(TreeNode* node);
+        Result<void> propagateCopies(TreeNode* body, const std::unordered_set<std::string>& eligible);
+        int replaceReadsWithIdentifier(TreeNode* parent, const std::string& from, const std::string& to);
+
+
+        Result<void> propagateConstants(TreeNode* body, const std::unordered_set<std::string>& eligible);
+        Result<void> propagateConstantsInFunctions(TreeNode* subprogs);
+        int countVariableWrites(TreeNode* node, const std::string& name);
+        bool subtreeReferences(TreeNode* node, const std::string& name);
+        int replaceVariableReads(TreeNode* parent, const std::string& name, const std::string& literal);
+
         Result<void> removeUnusedVariables(TreeNode* dclns, TreeNode* subprogs, TreeNode* body);
-        // For each function, remove locals that are never referenced in that function's body. Each function's locals are scoped to its own body, so they're checked there only.
         Result<void> removeUnusedLocalVariables(TreeNode* subprogs);
+        Result<void> removeUnusedFunctions(TreeNode* subprogs, TreeNode* body);
         bool isVariableUsed(TreeNode* subtreeRoot, const std::string& name);
         TreeNode* spliceDeclaration(TreeNode* dclns, const std::string& name);
         std::vector<std::string> collectDeclaredNames(TreeNode* dclns);

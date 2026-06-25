@@ -35,7 +35,23 @@ class CodeGenerator {
 public:
     CodeGenerator(TreeNode* ast, SymbolTable symbolTable,std::string outputFile = "output.asm");
     ~CodeGenerator();
-    Result<void> generate();    
+    Result<void> generate();
+
+    // The emitted program in sectioned, label-based assembly form. Valid only after
+    // generate() has run. This is the form the Optimizer's peephole pass operates on.
+    std::vector<std::string> assembly() const { return assembleSectioned(); }
+
+    // Write already-assembled lines (e.g. after peephole) to the output file.
+    void writeAssembly(const std::vector<std::string>& lines) const {
+        std::ofstream outFile(outputFile);
+        if (!outFile) {
+            LOG_ERROR("Failed to open output file: " + outputFile);
+            return;
+        }
+        for (const auto& line : lines) outFile << line << std::endl;
+        LOG_DEBUG("Generated code saved to " + outputFile);
+    }
+
     void printGeneratedCode() const {
         std::cout << "Generated Code:" << std::endl;
         for (const auto& line : generatedCode) {

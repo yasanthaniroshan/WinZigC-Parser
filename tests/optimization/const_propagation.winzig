@@ -1,0 +1,15 @@
+program const_propagation:
+# Single-assignment constant propagation chained with folding:
+#   base and step are each assigned a constant exactly once and propagated,
+#   so `scaled` becomes a pure constant expression that folds to one literal.
+# `live` is kept honest: it is read at runtime, so it must NOT be propagated,
+# and the program's output must be identical with and without optimization.
+var base, step, scaled, live : integer;
+begin
+  base := 6;
+  step := 4;
+  scaled := base * step + 2;   # -> 6*4+2 -> 26, fully folded
+  output(scaled);
+  read(live);
+  output(live + scaled);       # scaled is constant 26; live is runtime
+end const_propagation.
