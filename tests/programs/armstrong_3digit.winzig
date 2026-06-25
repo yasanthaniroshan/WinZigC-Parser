@@ -1,0 +1,19 @@
+program armstrong_3digit:
+# 1 if a 3-digit Armstrong number
+var x : integer;
+function f(n:integer):integer;
+var a, b, c : integer;
+begin
+  a := n / 100;
+  b := n / 10 mod 10;
+  c := n mod 10;
+  if a * a * a + b * b * b + c * c * c = n then return (1)
+  else return (0);
+end f;
+begin
+  read(x);
+  while x > 0 do begin
+    output(f(x));
+    read(x);
+  end;
+end armstrong_3digit.

@@ -1,0 +1,17 @@
+program to_binary:
+# For each number, print its binary digits high-to-low (one bit per line).
+var x, dummy : integer;
+function emit(n:integer):integer;
+var rest : integer;
+begin
+  if n > 1 then rest := emit(n / 2);
+  output(n mod 2);
+  return (0);
+end emit;
+begin
+  read(x);
+  while x > 0 do begin
+    dummy := emit(x);
+    read(x);
+  end;
+end to_binary.

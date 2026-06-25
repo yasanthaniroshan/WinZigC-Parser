@@ -1,0 +1,25 @@
+program catalan:
+var x : integer;
+function comb(n, k : integer):integer;
+var i, num, den : integer;
+begin
+  if k > n - k then k := n - k;
+  num := 1; den := 1; i := 0;
+  while i < k do begin
+    num := num * (n - i);
+    den := den * (i + 1);
+    i := i + 1;
+  end;
+  return (num / den);
+end comb;
+function catalan(n:integer):integer;
+begin
+  return (comb(2 * n, n) / (n + 1));
+end catalan;
+begin
+  read(x);
+  while x >= 0 do begin
+    output(catalan(x));
+    read(x);
+  end;
+end catalan.

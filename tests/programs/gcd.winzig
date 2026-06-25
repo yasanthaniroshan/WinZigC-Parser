@@ -1,0 +1,16 @@
+program gcd:
+# Read pairs (a b); print gcd(a, b). Stops when a <= 0.
+var a, b : integer;
+function gcd(a, b : integer):integer;
+begin
+  if b = 0 then return (a)
+  else return (gcd(b, a mod b));
+end gcd;
+begin
+  read(a);
+  while a > 0 do begin
+    read(b);
+    output(gcd(a, b));
+    read(a);
+  end;
+end gcd.

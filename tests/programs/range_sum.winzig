@@ -1,0 +1,16 @@
+program range_sum:
+# Read pairs (a b); print the sum of all integers between them (inclusive),
+# swapping if given out of order. Stops when a <= 0.
+var a, b, s, i : integer;
+begin
+  read(a);
+  while a > 0 do begin
+    read(b);
+    if a > b then a :=: b;
+    s := 0;
+    for (i := a; i <= b; i := i + 1)
+      s := s + i;
+    output(s);
+    read(a);
+  end;
+end range_sum.

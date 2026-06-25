@@ -1,0 +1,15 @@
+program sum_and_count:
+# Read a count, then that many numbers; print sum then how many are even.
+var count, i, x, s, evens : integer;
+begin
+  read(count);
+  s := 0; evens := 0; i := 0;
+  while i < count do begin
+    read(x);
+    s := s + x;
+    if x mod 2 = 0 then evens := evens + 1;
+    i := i + 1;
+  end;
+  output(s);
+  output(evens);
+end sum_and_count.

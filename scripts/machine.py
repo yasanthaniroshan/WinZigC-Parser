@@ -126,8 +126,11 @@ class StackMachine:
                     self.print_integer()
 
                 elif op == Op.LIT:
+                    # `lit` always carries an integer operand (the parser hands it
+                    # to us as a string). Push it as an int so values flowing
+                    # through save/load keep comparing correctly in iffalse/iftrue.
                     n = instr[1]
-                    self.push(n)
+                    self.push(int(n))
 
                 elif op == Op.GOTO:
                     n = instr[1]
@@ -136,13 +139,13 @@ class StackMachine:
 
                 elif op == Op.IFFALSE:
                     n = instr[1]
-                    if self.pop() == 0:
+                    if int(self.pop()) == 0:
                         self.pc = int(n) - 1
                         continue
 
                 elif op == Op.IFTRUE:
                     n = instr[1]
-                    if self.pop() == 1:
+                    if int(self.pop()) == 1:
                         self.pc = int(n) - 1
                         continue
 

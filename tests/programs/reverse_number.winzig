@@ -1,0 +1,20 @@
+program reverse_number:
+# reverse the decimal digits
+var x : integer;
+function f(n:integer):integer;
+var r : integer;
+begin
+  r := 0;
+  while n > 0 do begin
+    r := r * 10 + n mod 10;
+    n := n / 10;
+  end;
+  return (r);
+end f;
+begin
+  read(x);
+  while x > 0 do begin
+    output(f(x));
+    read(x);
+  end;
+end reverse_number.
