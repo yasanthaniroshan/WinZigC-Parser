@@ -1,17 +1,13 @@
 #!/usr/bin/env python3
 """End-to-end optimization test driver.
 
-Compiles a WinZigC source at BOTH -O O0 and -O O1, runs each through the
-stack machine (scripts/machine.py), and verifies three things:
-
-  1. the O0 (unoptimized, reference) output matches the expected file,
-  2. the O1 (optimized) output matches the expected file,
-  3. O0 and O1 produce identical output.
-
-Check (3) is the important one: it makes the suite fail if any optimization
-(dead-variable elimination, constant folding, frame compaction, ...) ever
-changes a program's observable behavior. winzigc always writes output.asm into
-its working directory, so each compile runs in a throwaway temp dir.
+Compiles a WinZigC source at every optimization level (-O O0, O1, O2), runs each
+through the stack machine (scripts/machine.py), and verifies that every level's
+output matches the expected file. Since O0 is the unoptimized reference, this
+makes the suite fail if any optimization at O1 (dead-code elimination) or O2
+(constant propagation + folding, on top of O1) ever changes a program's
+observable behavior. winzigc always writes output.asm into its working
+directory, so each compile runs in a throwaway temp dir.
 """
 import argparse
 import os
@@ -62,29 +58,18 @@ def main():
     if args.stdin and os.path.exists(args.stdin):
         stdin_data = pathlib.Path(args.stdin).read_text()
 
-    out0, err0 = _compile_and_run(args.winzigc, args.machine, args.source, "O0", stdin_data)
-    if err0:
-        sys.stderr.write(err0 + "\n")
-        return 1
-    out1, err1 = _compile_and_run(args.winzigc, args.machine, args.source, "O1", stdin_data)
-    if err1:
-        sys.stderr.write(err1 + "\n")
-        return 1
-
-    exp, n0, n1 = _normalize(expected), _normalize(out0), _normalize(out1)
+    exp = _normalize(expected)
     ok = True
-    if n0 != exp:
-        sys.stderr.write("O0 OUTPUT MISMATCH for %s\n--- expected ---\n%s\n--- got ---\n%s\n"
-                         % (args.source, expected, out0))
-        ok = False
-    if n1 != exp:
-        sys.stderr.write("O1 OUTPUT MISMATCH for %s\n--- expected ---\n%s\n--- got ---\n%s\n"
-                         % (args.source, expected, out1))
-        ok = False
-    if n0 != n1:
-        sys.stderr.write("OPTIMIZATION CHANGED BEHAVIOR for %s (O0 != O1)\n--- O0 ---\n%s\n--- O1 ---\n%s\n"
-                         % (args.source, out0, out1))
-        ok = False
+    for level in ("O0", "O1", "O2"):
+        out, err = _compile_and_run(args.winzigc, args.machine, args.source, level, stdin_data)
+        if err:
+            sys.stderr.write(err + "\n")
+            ok = False
+            continue
+        if _normalize(out) != exp:
+            sys.stderr.write("%s OUTPUT MISMATCH for %s\n--- expected ---\n%s\n--- got ---\n%s\n"
+                             % (level, args.source, expected, out))
+            ok = False
     return 0 if ok else 1
 
 

@@ -35,8 +35,10 @@ namespace {
 
 // Compile `source` through tokenize -> parse -> analyze -> optimize(level) ->
 // codegen and return the emitted assembly as trimmed, non-empty lines.
+// Default level is O2 (the full pipeline: dead-code + propagation + folding).
+// Dead-code-only behavior is exercised explicitly with "O1".
 std::vector<std::string> optimizeAsm(const std::string& source,
-                                     const std::string& level = "O1") {
+                                     const std::string& level = "O2") {
     std::vector<std::string> lines;
 
     auto tokens = Tokenizer(source).tokenize();
@@ -316,6 +318,28 @@ TEST(OptimizerConstPropTest, DoesNotPropagateWhenUsedBeforeDefinition) {
     EXPECT_TRUE(hasLine(asmLines, "load x"));                         // first output reads x
 }
 
+// Constant propagation also works on a function's own locals: `k := 10` is
+// propagated into `n + k`, the slot is reclaimed, and the body folds.
+TEST(OptimizerConstPropTest, PropagatesFunctionLocal) {
+    auto asmLines = optimizeAsm(
+        "program p:\n"
+        "var g : integer;\n"
+        "function f(n:integer):integer;\n"
+        "var k : integer;\n"
+        "begin\n"
+        "    k := 10;\n"
+        "    return (n + k);\n"
+        "end f;\n"
+        "begin\n"
+        "    g := f(5);\n"
+        "    output(g);\n"
+        "end p.\n");
+
+    EXPECT_TRUE(hasLine(asmLines, "lit 10"));        // k propagated to the literal
+    EXPECT_FALSE(hasOpcode(asmLines, "reserve"));    // k's frame slot reclaimed
+    EXPECT_FALSE(hasOpcode(asmLines, "save_local")); // k no longer stored
+}
+
 // A global assigned a constant once but also used inside a function is left
 // alone (cross-scope propagation would be unsound).
 TEST(OptimizerConstPropTest, DoesNotPropagateGlobalUsedInFunction) {
@@ -385,7 +409,7 @@ TEST(OptimizerDeadLocalTest, RemovesAllLocalsDropsReserve) {
 }
 
 // ---------------------------------------------------------------------------
-// O0 is a no-op
+// Optimization levels: O0 = nothing, O1 = dead-code only, O2 = + propagate/fold
 // ---------------------------------------------------------------------------
 
 TEST(OptimizerLevelTest, O0DoesNotFoldConstants) {
@@ -414,4 +438,60 @@ TEST(OptimizerLevelTest, O0KeepsUnusedGlobal) {
 
     auto vars = dataVars(asmLines);
     EXPECT_NE(std::find(vars.begin(), vars.end(), "unused"), vars.end());
+}
+
+// O1 does dead-code elimination but NOT constant folding/propagation.
+TEST(OptimizerLevelTest, O1RemovesDeadCodeButDoesNotFold) {
+    auto asmLines = optimizeAsm(
+        "program p:\n"
+        "var x : integer; unused : integer;\n"
+        "begin\n"
+        "    x := 7 + 4;\n"
+        "    output(x);\n"
+        "end p.\n",
+        "O1");
+
+    EXPECT_TRUE(hasOpcode(asmLines, "add"));          // not folded at O1
+    EXPECT_FALSE(hasLine(asmLines, "lit 11"));
+    auto vars = dataVars(asmLines);
+    EXPECT_EQ(std::find(vars.begin(), vars.end(), "unused"), vars.end());  // dead global gone
+}
+
+// O2 folds (and propagates).
+TEST(OptimizerLevelTest, O2FoldsConstants) {
+    auto asmLines = optimizeAsm(
+        "program p:\n"
+        "var x : integer;\n"
+        "begin\n"
+        "    x := 7 + 4;\n"
+        "    output(x);\n"
+        "end p.\n",
+        "O2");
+
+    EXPECT_TRUE(hasLine(asmLines, "lit 11"));
+    EXPECT_FALSE(hasOpcode(asmLines, "add"));
+}
+
+// O1 removes a function that is never called (dead-code elimination).
+TEST(OptimizerLevelTest, O1RemovesUnusedFunction) {
+    auto asmLines = optimizeAsm(
+        "program p:\n"
+        "var g : integer;\n"
+        "function used(n:integer):integer;\n"
+        "begin\n"
+        "    return (n + 1);\n"
+        "end used;\n"
+        "function dead(n:integer):integer;\n"
+        "begin\n"
+        "    return (n + 777);\n"
+        "end dead;\n"
+        "begin\n"
+        "    g := used(5);\n"
+        "    output(g);\n"
+        "end p.\n",
+        "O1");
+
+    EXPECT_TRUE(hasLine(asmLines, "used:"));     // called function kept
+    EXPECT_FALSE(hasLine(asmLines, "dead:"));    // uncalled function removed
+    EXPECT_FALSE(hasLine(asmLines, "lit 777"));  // its body is gone
 }

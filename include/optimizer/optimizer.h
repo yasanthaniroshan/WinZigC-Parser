@@ -1,6 +1,8 @@
 #ifndef OPTIMIZER_H
 #define OPTIMIZER_H
 
+#include <string>
+#include <unordered_set>
 #include "common/result.h"
 #include "common/error.h"
 #include "utils/tree.h"
@@ -73,8 +75,12 @@ class Optimizer {
 
         // Single-assignment constant propagation: replace a variable that is assigned
         // exactly once (to an integer literal) with that literal at its uses, then drop
-        // the assignment. See the .cpp for the dominance-safety conditions.
-        Result<void> propagateConstants(TreeNode* body, TreeNode* subprogs);
+        // the assignment. `eligible` lists the names allowed to be propagated in `body`
+        // (globals confined to the main body, or a function's own locals). See the .cpp
+        // for the dominance-safety conditions.
+        Result<void> propagateConstants(TreeNode* body, const std::unordered_set<std::string>& eligible);
+        // Run constant propagation within each function body over that function's locals.
+        Result<void> propagateConstantsInFunctions(TreeNode* subprogs);
         int countVariableWrites(TreeNode* node, const std::string& name);
         bool subtreeReferences(TreeNode* node, const std::string& name);
         int replaceVariableReads(TreeNode* parent, const std::string& name, const std::string& literal);
@@ -83,6 +89,10 @@ class Optimizer {
         Result<void> removeUnusedVariables(TreeNode* dclns, TreeNode* subprogs, TreeNode* body);
         // For each function, remove locals that are never referenced in that function's body. Each function's locals are scoped to its own body, so they're checked there only.
         Result<void> removeUnusedLocalVariables(TreeNode* subprogs);
+        // Remove functions that are never called (dead-code elimination). A function is
+        // "called" only if referenced outside its own body, so unreachable recursive
+        // functions are removed too. Iterates to a fixpoint.
+        Result<void> removeUnusedFunctions(TreeNode* subprogs, TreeNode* body);
         bool isVariableUsed(TreeNode* subtreeRoot, const std::string& name);
         TreeNode* spliceDeclaration(TreeNode* dclns, const std::string& name);
         std::vector<std::string> collectDeclaredNames(TreeNode* dclns);

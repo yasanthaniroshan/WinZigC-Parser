@@ -1,74 +1,91 @@
 #include "optimizer/optimizer.h"
 #include <iostream>
+#include <unordered_set>
 
 Result<TreeNode *> Optimizer::optimize()
 {
+    // O0: emit exactly what the front end produced.
     if (optimizationLevel == "O0")
     {
         return Result<TreeNode *>::Ok(ast);
     }
-    if (optimizationLevel == "O1")
+    const bool isO1 = (optimizationLevel == "O1");
+    const bool isO2 = (optimizationLevel == "O2");
+    if (!isO1 && !isO2)
     {
+        return Result<TreeNode *>::Ok(ast); // unknown level: leave the tree untouched
+    }
+
+    TreeNode *name = ast->left;        // First child is program name
+    TreeNode *consts = name->right;    // First sibling is const declarations
+    TreeNode *types = consts->right;   // Next sibling is type declarations
+    TreeNode *dclns = types->right;    // Next sibling is variable and function declarations
+    TreeNode *subprogs = dclns->right; // Next sibling is subprogram declarations
+    TreeNode *body = subprogs->right;  // Next sibling is the body of the program
+
+    // ---- O1 (and O2): dead-code elimination ----
+    // Order: unused globals, then unused locals, then unused functions.
+    auto rGlobals = removeUnusedVariables(dclns, subprogs, body);
+    if (rGlobals.isErr())
+        return Result<TreeNode *>::Err(OptimizerError(rGlobals.error_message.value()));
+    auto rLocals = removeUnusedLocalVariables(subprogs);
+    if (rLocals.isErr())
+        return Result<TreeNode *>::Err(OptimizerError(rLocals.error_message.value()));
+    auto rFunctions = removeUnusedFunctions(subprogs, body);
+    if (rFunctions.isErr())
+        return Result<TreeNode *>::Err(OptimizerError(rFunctions.error_message.value()));
+
+    // ---- O2 only: constant propagation + constant folding ----
+    if (isO2)
+    {
+        // Globals eligible for propagation: confined to the main body (not touched by
+        // any surviving subprogram), so the single-definition analysis is sound.
+        std::unordered_set<std::string> eligibleGlobals;
+        for (const auto &g : collectDeclaredNames(dclns))
+            if (!subtreeReferences(subprogs, g))
+                eligibleGlobals.insert(g);
+
         int numberOfPasses = 0;
-        TreeNode *name = ast->left;       // First child is program name
-        TreeNode *consts = name->right;    // First sibling is const declarations
-        TreeNode *types = consts->right;   // Next sibling is type declarations
-        TreeNode *dclns = types->right;    // Next sibling is variable and function declarations
-        TreeNode *subprogs = dclns->right; // Next sibling is subprogram declarations
-        TreeNode *body = subprogs->right; // Next sibling is the body of the program
-        auto resultUnusedVars = removeUnusedVariables(dclns, subprogs, body);
-        if (resultUnusedVars.isErr())
-        {
-            return Result<TreeNode *>::Err(OptimizerError(resultUnusedVars.error_message.value()));
-        }
-        auto resultUnusedLocals = removeUnusedLocalVariables(subprogs);
-        if (resultUnusedLocals.isErr())
-        {
-            return Result<TreeNode *>::Err(OptimizerError(resultUnusedLocals.error_message.value()));
-        }
         while (numberOfPasses < MAX_PASSES)
         {
             instructionRemovedCount = 0;
             // Propagate single-assignment constants first: this turns expressions like
             // `x + 3` (x assigned a constant) into foldable `5 + 3`, which the folding
             // pass then collapses. Running both to a fixpoint chains the two together.
-            auto propagated = propagateConstants(body, subprogs);
-            if (propagated.isErr())
-            {
-                return Result<TreeNode *>::Err(OptimizerError(propagated.error_message.value()));
-            }
-            auto result = constantFoldingPass();
-            if (result.isErr())
-            {
-                return Result<TreeNode *>::Err(OptimizerError(result.error_message.value()));
-            }
+            auto pGlobals = propagateConstants(body, eligibleGlobals);
+            if (pGlobals.isErr())
+                return Result<TreeNode *>::Err(OptimizerError(pGlobals.error_message.value()));
+            auto pLocals = propagateConstantsInFunctions(subprogs);
+            if (pLocals.isErr())
+                return Result<TreeNode *>::Err(OptimizerError(pLocals.error_message.value()));
+            auto folded = constantFoldingPass();
+            if (folded.isErr())
+                return Result<TreeNode *>::Err(OptimizerError(folded.error_message.value()));
             LOG_DEBUG("instructions removed: " + std::to_string(instructionRemovedCount));
             if (instructionRemovedCount == 0)
-            {
-                break; // No more optimizations possible
-            }
+                break; // fixpoint reached
             numberOfPasses++;
         }
-        // Propagation can leave globals with no remaining references; sweep them out
-        // of .data (and the declaration list) now that their uses are gone.
-        auto cleanup = removeUnusedVariables(dclns, subprogs, body);
-        if (cleanup.isErr())
-        {
-            return Result<TreeNode *>::Err(OptimizerError(cleanup.error_message.value()));
-        }
-        if (!warnings.empty())
-        {
-            std::cerr << "\n";
-            for (const auto &warning : warnings)
-            {
-                diagnostics::warning(warning.msg, warning.line, warning.column);
-            }
-            diagnostics::summary("Optimization completed with " + std::to_string(warnings.size()) + " warning(s).",
-                                 diagnostics::Severity::Warning);
-        }
-        return Result<TreeNode *>::Ok(ast);
+
+        // Propagation can leave globals/locals with no remaining references; sweep them.
+        auto cGlobals = removeUnusedVariables(dclns, subprogs, body);
+        if (cGlobals.isErr())
+            return Result<TreeNode *>::Err(OptimizerError(cGlobals.error_message.value()));
+        auto cLocals = removeUnusedLocalVariables(subprogs);
+        if (cLocals.isErr())
+            return Result<TreeNode *>::Err(OptimizerError(cLocals.error_message.value()));
     }
-    // TODO: O1+ passes (constant folding, dead-code elimination) go here.
+
+    if (!warnings.empty())
+    {
+        std::cerr << "\n";
+        for (const auto &warning : warnings)
+        {
+            diagnostics::warning(warning.msg, warning.line, warning.column);
+        }
+        diagnostics::summary("Optimization completed with " + std::to_string(warnings.size()) + " warning(s).",
+                             diagnostics::Severity::Warning);
+    }
     return Result<TreeNode *>::Ok(ast);
 }
 
@@ -467,7 +484,7 @@ int Optimizer::replaceVariableReads(TreeNode *parent, const std::string &name, c
 //   - it is written exactly once in the body, by a top-level `v := <integer>`,
 //   - no earlier top-level statement references it.
 // Then every later read is rewritten to the literal and the assignment removed.
-Result<void> Optimizer::propagateConstants(TreeNode *body, TreeNode *subprogs)
+Result<void> Optimizer::propagateConstants(TreeNode *body, const std::unordered_set<std::string> &eligible)
 {
     if (!body || !body->left) return Result<void>::Ok();
 
@@ -482,11 +499,11 @@ Result<void> Optimizer::propagateConstants(TreeNode *body, TreeNode *subprogs)
         {
             const std::string name = stmt->left->left->value;
             TreeNode *rhs = stmt->left->right;
-            if (rhs && rhs->value == "<integer>" && rhs->left)
+            // Only names the caller vouched for (confined to this body) may propagate.
+            if (eligible.count(name) && rhs && rhs->value == "<integer>" && rhs->left)
             {
                 const std::string literal = rhs->left->value;
-                bool confined = !subprogs || !subtreeReferences(subprogs, name);
-                if (confined && countVariableWrites(body, name) == 1)
+                if (countVariableWrites(body, name) == 1)
                 {
                     bool referencedBefore = false;
                     for (TreeNode *s = body->left; s != stmt; s = s->right)
@@ -507,6 +524,78 @@ Result<void> Optimizer::propagateConstants(TreeNode *body, TreeNode *subprogs)
 
         if (!removed) prevStmt = stmt;
         stmt = nextStmt;
+    }
+    return Result<void>::Ok();
+}
+
+// Constant-propagate within each function body, restricted to that function's own
+// locals (which are confined to the body by scoping, so the analysis is sound).
+Result<void> Optimizer::propagateConstantsInFunctions(TreeNode *subprogs)
+{
+    if (!subprogs) return Result<void>::Ok();
+    for (TreeNode *fcn = subprogs->left; fcn != nullptr; fcn = fcn->right)
+    {
+        TreeNode *name = fcn->left; // function name identifier
+        if (!name) continue;
+        // Layout: name, params, returnType, consts, types, dclns, body, endName.
+        TreeNode *params = name->right;     if (!params) continue;
+        TreeNode *returnType = params->right; if (!returnType) continue;
+        TreeNode *consts = returnType->right; if (!consts) continue;
+        TreeNode *types = consts->right;    if (!types) continue;
+        TreeNode *dclns = types->right;     if (!dclns) continue;
+        TreeNode *body = dclns->right;      if (!body) continue;
+
+        std::unordered_set<std::string> locals;
+        for (const auto &local : collectDeclaredNames(dclns))
+            locals.insert(local);
+        if (locals.empty()) continue;
+
+        auto r = propagateConstants(body, locals);
+        if (r.isErr()) return r;
+    }
+    return Result<void>::Ok();
+}
+
+// Remove functions that are never called. A function counts as called only if its
+// name is referenced OUTSIDE its own subtree (the main body or another function),
+// so a recursive function reachable from nowhere is still removed. Iterates to a
+// fixpoint because removing one function can make another (only it called) dead.
+Result<void> Optimizer::removeUnusedFunctions(TreeNode *subprogs, TreeNode *body)
+{
+    if (!subprogs) return Result<void>::Ok();
+    bool changed = true;
+    while (changed)
+    {
+        changed = false;
+        TreeNode *prev = nullptr;
+        for (TreeNode *fcn = subprogs->left; fcn != nullptr;)
+        {
+            TreeNode *next = fcn->right;
+            TreeNode *nameId = fcn->left;
+            std::string fname = (nameId && nameId->left) ? nameId->left->value : "";
+
+            bool used = !fname.empty() && subtreeReferences(body, fname);
+            if (!used && !fname.empty())
+            {
+                for (TreeNode *other = subprogs->left; other != nullptr; other = other->right)
+                {
+                    if (other != fcn && subtreeReferences(other, fname)) { used = true; break; }
+                }
+            }
+
+            if (!used)
+            {
+                if (prev == nullptr) subprogs->left = next;
+                else prev->right = next;
+                addWarning("Removed unused function '" + fname + "'.",
+                           nameId ? nameId->line : -1, nameId ? nameId->column : -1);
+                changed = true;
+                fcn = next;
+                continue;
+            }
+            prev = fcn;
+            fcn = next;
+        }
     }
     return Result<void>::Ok();
 }
