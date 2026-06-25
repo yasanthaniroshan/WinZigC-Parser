@@ -64,6 +64,7 @@ class TreeTraveler {
         bool started = false; // Whether the frontier has been seeded with the root yet.
 public:
     explicit TreeTraveler(TreeNode* root) : root(root), current(root) {}
+    void setSubtreeRoot(TreeNode* newRoot) { root = newRoot; current = newRoot; reset(); }
     void setNodeValue(const std::string& value) { nodeValue = value; }
     void setSearchMethod(SearchMethod method) { searchMethod = method; }
     // Rewind the traversal so the next step() re-seeds the frontier from the root.

@@ -48,7 +48,8 @@ TreeNode* TreeTraveler::step() {
             auto [node, slot] = dfsStack.back();
             dfsStack.pop_back();
             // Push right before left so left is the next one popped, preserving left-to-right order.
-            if (node->right) dfsStack.push_back({node->right, &node->right});
+            // Skip the root's own right sibling: it lies outside the subtree we're scoped to. (Children, reached via left and their own right links, are still traversed.)
+            if (node != root && node->right) dfsStack.push_back({node->right, &node->right});
             if (node->left) dfsStack.push_back({node->left, &node->left});
             current = node;
             if (node->value == nodeValue) {
@@ -62,7 +63,8 @@ TreeNode* TreeTraveler::step() {
             auto [node, slot] = bfsQueue.front();
             bfsQueue.pop();
             if (node->left) bfsQueue.push({node->left, &node->left});
-            if (node->right) bfsQueue.push({node->right, &node->right});
+            // Skip the root's own right sibling: it lies outside the subtree we're scoped to.
+            if (node != root && node->right) bfsQueue.push({node->right, &node->right});
             current = node;
             if (node->value == nodeValue) {
                 pointer = node;
@@ -75,11 +77,6 @@ TreeNode* TreeTraveler::step() {
     return nullptr; // Frontier exhausted: no (more) matching node.
 }
 
-// `pointerSlot` is the address of whichever field (some ancestor's left or right)
-// pointed at `pointer`, recorded by step() when it found the match. Redirecting that
-// field is a real structural splice, not a content swap. Returns false if nothing has
-// been found yet, or if `pointer` is the root (nothing points at the root, so there's
-// no slot to redirect).
 bool TreeTraveler::swap(TreeNode* newNode) {
     if (!pointer || !newNode || !pointerSlot) return false;
 

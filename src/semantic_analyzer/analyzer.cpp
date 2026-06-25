@@ -634,7 +634,7 @@ void SemanticAnalyzer::analyzeAssignment(TreeNode *node)
         }
         if (getSemanticTypeFromSymbolType(sym->type) != exprType)
         {
-            addError("Type mismatch in assignment to '" + leftNode->value + "'. Expected type: " + symbolTypeToString(sym->type) + ", but got: " + std::to_string(static_cast<int>(exprType)), leftNode->left);
+            addError("Type mismatch in assignment to '" + leftNode->value + "'. Expected type: " + symbolTypeToString(sym->type) + ", but got: " + semanticTypeToString(exprType), leftNode->left);
             return;
         }
     }
@@ -719,7 +719,7 @@ SemanticType SemanticAnalyzer::analyzeExpression(TreeNode *node)
         SemanticType rightType = analyzeTerm(rightNode);
         if (leftType != rightType)
         {
-            addError("Type mismatch in relational expression. Left operand has type '" + std::to_string(static_cast<int>(leftType)) + "', but right operand has type '" + std::to_string(static_cast<int>(rightType)) + "'.", current);
+            addError("Type mismatch in relational expression. Left operand has type '" + semanticTypeToString(leftType) + "', but right operand has type '" + semanticTypeToString(rightType) + "'.", current);
             return SemanticType::Unknown;
         }
         if (current->value == "<>" || current->value == "=")
@@ -795,7 +795,7 @@ SemanticType SemanticAnalyzer::analyzeTerm(TreeNode *node)
                 return SemanticType::Boolean;
             }
         }
-        addError("Type mismatch in term expression. Left operand has type '" + std::to_string(static_cast<int>(leftType)) + "', but right operand has type '" + std::to_string(static_cast<int>(rightType)) + "'.", current);
+        addError("Type mismatch in term expression. Left operand has type '" + semanticTypeToString(leftType) + "', but right operand has type '" + semanticTypeToString(rightType) + "'.", current);
         return SemanticType::Unknown; // If types are not compatible for term expressions, return unknown
     }
     else
@@ -820,7 +820,7 @@ SemanticType SemanticAnalyzer::analyzeFactor(TreeNode *node)
         // Handle Leave Nodes
         if (leftType != rightType)
         {
-            addError("Type mismatch in factor expression. Left operand has type '" + std::to_string(static_cast<int>(leftType)) + "', but right operand has type '" + std::to_string(static_cast<int>(rightType)) + "'.", current);
+            addError("Type mismatch in factor expression. Left operand has type '" + semanticTypeToString(leftType) + "', but right operand has type '" + semanticTypeToString(rightType) + "'.", current);
             return SemanticType::Unknown;
         }
         if (current->value == "*" || current->value == "/" || current->value == "mod")
@@ -840,7 +840,7 @@ SemanticType SemanticAnalyzer::analyzeFactor(TreeNode *node)
                 return SemanticType::Boolean;
             }
         }
-        addError("Type mismatch in factor expression. Left operand has type '" + std::to_string(static_cast<int>(leftType)) + "', but right operand has type '" + std::to_string(static_cast<int>(rightType)) + "'.", current);
+        addError("Type mismatch in factor expression. Left operand has type '" + semanticTypeToString(leftType) + "', but right operand has type '" + semanticTypeToString(rightType) + "'.", current);
         return SemanticType::Unknown; // If types are not compatible for factor expressions, return unknown
     }
     else
@@ -871,7 +871,7 @@ SemanticType SemanticAnalyzer::analyzePrimary(TreeNode *node)
             LOG_DEBUG("Analyzing unary minus expression.");
             return SemanticType::Integer;
         }
-        addError("Unary minus operator requires an integer operand, but got type '" + std::to_string(static_cast<int>(operandType)) + "'.", current);
+        addError("Unary minus operator requires an integer operand, but got type '" + semanticTypeToString(operandType) + "'.", current);
         return SemanticType::Unknown;
     }
     else if (current->value == "not")
@@ -883,7 +883,7 @@ SemanticType SemanticAnalyzer::analyzePrimary(TreeNode *node)
             LOG_DEBUG("Analyzing logical NOT expression.");
             return SemanticType::Boolean;
         }
-        addError("Logical NOT operator requires a boolean operand, but got type '" + std::to_string(static_cast<int>(operandType)) + "'.", current);
+        addError("Logical NOT operator requires a boolean operand, but got type '" + semanticTypeToString(operandType) + "'.", current);
         return SemanticType::Unknown;
     }
     else if (current->value == "eof")
@@ -938,7 +938,7 @@ SemanticType SemanticAnalyzer::analyzePrimary(TreeNode *node)
             LOG_DEBUG("Analyzing successor or predecessor function with integer operand.");
             return SemanticType::Integer;
         }
-        addError("Successor or predecessor function requires an integer operand, but got type '" + std::to_string(static_cast<int>(operandType)) + "'.", current);
+        addError("Successor or predecessor function requires an integer operand, but got type '" + semanticTypeToString(operandType) + "'.", current);
         return SemanticType::Unknown;
     }
     else if (current->value == "ord" || current->value == "chr")
@@ -953,7 +953,7 @@ SemanticType SemanticAnalyzer::analyzePrimary(TreeNode *node)
                 LOG_DEBUG("Analyzing ordinal conversion function with character operand.");
                 return SemanticType::Integer;
             }
-            addError("Ordinal conversion function requires a character operand, but got type '" + std::to_string(static_cast<int>(operandType)) + "'.", current);
+            addError("Ordinal conversion function requires a character operand, but got type '" + semanticTypeToString(operandType) + "'.", current);
             return SemanticType::Unknown;
         }
         else // current->value == "chr"
@@ -963,7 +963,7 @@ SemanticType SemanticAnalyzer::analyzePrimary(TreeNode *node)
                 LOG_DEBUG("Analyzing character conversion function with integer operand.");
                 return SemanticType::Char;
             }
-            addError("Character conversion function requires an integer operand, but got type '" + std::to_string(static_cast<int>(operandType)) + "'.", current);
+            addError("Character conversion function requires an integer operand, but got type '" + semanticTypeToString(operandType) + "'.", current);
             return SemanticType::Unknown;
         }
     }
