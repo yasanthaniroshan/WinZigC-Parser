@@ -38,6 +38,11 @@ void SymbolTable::exitScope() {
     }
 }
 
+int SymbolTable::scopeLocalCount(int index) const {
+    if (index < 0 || index >= static_cast<int>(scopes.size())) return 0;
+    return scopes[index].addressCounter;
+}
+
 bool SymbolTable::declare(const Symbol& sym) {
     if (scopes.empty() || currentScope < 0) return false; // No scope to declare in
 
@@ -46,6 +51,9 @@ bool SymbolTable::declare(const Symbol& sym) {
     Symbol s = sym;
     if (s.kind == SymbolKind::Variable) {
         s.address = scope.addressCounter++;
+        // Record the owning scope so code generation can tell a global (scope 0,
+        // absolute addressing) from a function-local (frame-relative addressing).
+        s.scopeIndex = currentScope;
     } else {
         s.address = -1;
     }

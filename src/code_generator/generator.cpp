@@ -22,6 +22,16 @@ void CodeGenerator::emit(const std::string& instr, const std::string& operand) {
     generatedCode.push_back(instr + " " + operand);
 }
 
+// Globals live in scope 0 at absolute stack slots; function params/locals are
+// addressed relative to the current frame pointer (stack[fp + address]).
+void CodeGenerator::emitVarLoad(const Symbol* sym) {
+    emit(sym->scopeIndex == 0 ? "load" : "load_local", sym->address);
+}
+
+void CodeGenerator::emitVarSave(const Symbol* sym) {
+    emit(sym->scopeIndex == 0 ? "save" : "save_local", sym->address);
+}
+
 //===== Code generation =====
 Result<void> CodeGenerator::generate()
 {
@@ -177,17 +187,22 @@ Result<CodeResult> CodeGenerator::generateFcn(TreeNode *node, CodeInput input)
         }
     }
 
-    // Saving arguments from stack into parameter values
-    // NOTE: Since arguments are pushed left-to-right, LAST argument is at the TOP
-    // of the stack - popping must be in reverse the order.
-    for (int i = static_cast<int>(paramNames.size()) - 1 ; i >= 0 ; i--) {
-        Symbol *sym = symbolTable.lookup(paramNames[i]);
-        if (sym) {
-            emit("save", sym->address);
-            currentRes.stackPointer--; // save will pop from stack
-            currentRes.nextInstruction++;
-        }
+    // The Prologue - establish this function's activation frame.
+    // The caller pushed the arguments onto the operand stack; `enter` rebases the
+    // frame pointer so those args BECOME the first frame slots (params 0..argc-1),
+    // and `reserve` lifts the operand stack above the function's local variables.
+    int argc = static_cast<int>(paramNames.size());
+    int nlocals = (fcnSym ? symbolTable.scopeLocalCount(fcnSym->scopeIndex) : argc);
+    int nvars = nlocals - argc; // non-parameter locals
+
+    emit("enter", argc);
+    currentRes.nextInstruction++;
+    if (nvars > 0) {
+        emit("reserve", nvars);
+        currentRes.nextInstruction++;
     }
+    // The args are now in their frame slots and the operand stack is empty.
+    currentRes.stackPointer = 0;
 
     // Generate function body
     auto bodyRes = generateBody(bodyNode, CodeInput(currentRes.stackPointer, currentRes.nextInstruction));
@@ -389,7 +404,7 @@ Result<CodeResult> CodeGenerator::generateExpression(TreeNode *node, CodeInput i
         if (sym == nullptr) return Result<CodeResult>::Err(CodeGeneratorError("Undeclared identifier: " + name));
 
         if (sym->kind == SymbolKind::Variable) {
-            emit("load", sym->address);
+            emitVarLoad(sym);
         } else if (sym->kind == SymbolKind::Constant) {
             emit("lit", sym->ordinal); // push constant value directly to stack
         }
@@ -526,7 +541,7 @@ Result<CodeResult> CodeGenerator::generateAssignment(TreeNode *node, CodeInput i
     }
 
     // Save instruction using precalculated address
-    emit("save", sym->address);
+    emitVarSave(sym);
 
     currentRes.stackPointer--; // save instruction pops value off stack
     currentRes.nextInstruction++;
@@ -551,10 +566,10 @@ Result<CodeResult> CodeGenerator::generateSwap(TreeNode* node, CodeInput input) 
         return Result<CodeResult>::Err(CodeGeneratorError("Undeclared variable in swap"));
     }
 
-    emit("load", sym1->address); // stack: [... var1] (top)
-    emit("load", sym2->address); // stack: [... var1, var2] (top)
-    emit("save", sym1->address); // pop var2 and save in address of var1
-    emit("save", sym2->address); // pop var1 and save in address of var2
+    emitVarLoad(sym1); // stack: [... var1] (top)
+    emitVarLoad(sym2); // stack: [... var1, var2] (top)
+    emitVarSave(sym1); // pop var2 and save in address of var1
+    emitVarSave(sym2); // pop var1 and save in address of var2
 
     // pushed two to stack, popped two from stack - stackPointer unchanged
     // emitted four additional instructions - nextInstruction += 4
@@ -704,7 +719,7 @@ Result<CodeResult> CodeGenerator::generateReadStatement(TreeNode* node, CodeInpu
             return Result<CodeResult>::Err(CodeGeneratorError("Invalid variable for read: " + varName));
         }
         // save the value to the variable
-        emit("save", sym->address);
+        emitVarSave(sym);
         currentRes.stackPointer--;
         currentRes.nextInstruction++;
 

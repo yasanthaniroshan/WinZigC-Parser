@@ -117,15 +117,41 @@ add_executable(tests
     tests/unit/test_parser_edges.cpp
     tests/unit/test_analyzer.cpp
     tests/unit/test_symbol_table.cpp
+    tests/unit/test_code_generator.cpp
 )
 target_compile_definitions(tests PRIVATE
     TEST_GRAMMAR_DIR="${CMAKE_SOURCE_DIR}/tests/grammar"
     TEST_INTEGRATION_DIR="${CMAKE_SOURCE_DIR}/tests/integration"
 )
-target_link_libraries(tests PRIVATE gtest_main utils semantic_analyzer)
+# code_generator pulls in semantic_analyzer (and the rest of the pipeline) transitively.
+target_link_libraries(tests PRIVATE gtest_main utils code_generator)
 
 include(GoogleTest)
 gtest_discover_tests(tests)
+
+# --- End-to-end VM tests ---
+# Compile each tests/vm/*.winzig with winzigc, run the emitted assembly through
+# scripts/machine.py, and diff stdout against the matching .out file. These
+# exercise the frame-pointer calling convention at runtime (recursion, nested
+# live calls) and are skipped automatically if no Python 3 interpreter is found.
+find_package(Python3 COMPONENTS Interpreter)
+if(Python3_Interpreter_FOUND)
+    file(GLOB _vm_cases ${CMAKE_SOURCE_DIR}/tests/vm/*.winzig)
+    foreach(_case ${_vm_cases})
+        get_filename_component(_name ${_case} NAME_WE)
+        set(_stdin_arg "")
+        if(EXISTS ${CMAKE_SOURCE_DIR}/tests/vm/${_name}.in)
+            set(_stdin_arg --stdin ${CMAKE_SOURCE_DIR}/tests/vm/${_name}.in)
+        endif()
+        add_test(NAME vm_${_name}
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/vm/run_case.py
+                --winzigc $<TARGET_FILE:winzigc>
+                --machine ${CMAKE_SOURCE_DIR}/scripts/machine.py
+                --source ${_case}
+                --expected ${CMAKE_SOURCE_DIR}/tests/vm/${_name}.out
+                ${_stdin_arg})
+    endforeach()
+endif()
 
 # --- Coverage ---
 option(ENABLE_COVERAGE "Enable coverage" OFF)

@@ -1,0 +1,18 @@
+program factorial:
+
+# Recursion: each call gets its own activation frame. Impossible under the old
+# per-scope absolute-address scheme, which gave every variable one fixed slot.
+
+var n : integer;
+
+function fact(k:integer):integer;
+begin
+    if (k <= 1) then
+        return (1)
+    else
+        return (k * fact(k - 1));
+end fact;
+
+begin
+    output(fact(5));
+end factorial.

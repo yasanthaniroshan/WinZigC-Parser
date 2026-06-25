@@ -1,0 +1,20 @@
+program nested_calls:
+
+# Two function calls simultaneously live as operands of '+': each must occupy
+# its own frame, above the caller's live operand stack.
+
+var g : integer;
+
+function inc(x:integer):integer;
+begin
+    return (x + 1);
+end inc;
+
+function dbl(x:integer):integer;
+begin
+    return (inc(x) + inc(x));
+end dbl;
+
+begin
+    output(dbl(10));
+end nested_calls.
