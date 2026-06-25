@@ -51,6 +51,7 @@ std::string treeToString(TreeNode* node, int depth = 0);
 
 class TreeTraveler {
     private:
+        TreeNode* root;
         TreeNode* current;
         std::string nodeValue;
         TreeNode* pointer = nullptr;
@@ -62,9 +63,19 @@ class TreeTraveler {
         std::queue<std::pair<TreeNode*, TreeNode**>> bfsQueue;
         bool started = false; // Whether the frontier has been seeded with the root yet.
 public:
-    explicit TreeTraveler(TreeNode* root) : current(root) {}
+    explicit TreeTraveler(TreeNode* root) : root(root), current(root) {}
     void setNodeValue(const std::string& value) { nodeValue = value; }
     void setSearchMethod(SearchMethod method) { searchMethod = method; }
+    // Rewind the traversal so the next step() re-seeds the frontier from the root.
+    // Required before reusing the same traveler for another pass (e.g. a different nodeValue).
+    void reset() {
+        current = root;
+        pointer = nullptr;
+        pointerSlot = nullptr;
+        dfsStack.clear();
+        bfsQueue = {};
+        started = false;
+    }
     TreeNode* step();
     bool swap(TreeNode* newNode);
 };

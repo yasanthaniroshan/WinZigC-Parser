@@ -56,6 +56,15 @@ class Optimizer {
         int spaceAddedCount = 0; // Count of space added during optimization passes.
         Result<void> constantFoldingPass();
         Result<void> removeMinusNode(TreeNode* node);
+        Result<void> removeConstantAddition(TreeNode* node);
+        Result<void> removeConstantSubtraction(TreeNode* node);
+        Result<void> removeConstantMultiplication(TreeNode* node);
+        Result<void> removeConstantDivision(TreeNode* node);
+
+        Result<void> removeConstantModulus(TreeNode* node);
+        Result<void> removeConstantBitwiseAnd(TreeNode* node);
+        Result<void> removeConstantBitwiseOr(TreeNode* node);
+
 
 };
 
