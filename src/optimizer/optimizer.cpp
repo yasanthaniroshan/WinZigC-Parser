@@ -245,7 +245,6 @@ Result<void> Optimizer::removeConstantModulus(TreeNode *node)
     return Result<void>::Ok();
 }
 
-// Does `name` appear anywhere in the given subtree? Scoped so a variable's own declaration (which lives under dclns, outside subprogs/body) never counts as a use.
 bool Optimizer::isVariableUsed(TreeNode *subtreeRoot, const std::string &name)
 {
     if (!subtreeRoot) return false;
@@ -312,8 +311,6 @@ Result<void> Optimizer::removeUnusedVariables(TreeNode *dclns, TreeNode *subprog
     return Result<void>::Ok();
 }
 
-// Collect every variable name declared in a dclns list. A `var` node holds one or more
-// name identifiers followed by a single type identifier (left-child/right-sibling).
 std::vector<std::string> Optimizer::collectDeclaredNames(TreeNode *dclns)
 {
     std::vector<std::string> names;

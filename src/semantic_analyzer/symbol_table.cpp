@@ -61,23 +61,10 @@ std::vector<std::pair<std::string, int>> SymbolTable::globalVariables() const {
 }
 
 bool SymbolTable::removeGlobalVariable(const std::string& name) {
-    // Erase a global (scope-0) variable so it no longer appears in the .data section.
-    // Globals have no parameters, so the general per-scope removal applies directly:
-    // remaining globals with a higher address compact down and the slot count shrinks,
-    // keeping .data addresses contiguous (save/load reference globals by name, so this
-    // renumbering stays consistent through code generation).
     return removeLocalVariable(0, name);
 }
 
 bool SymbolTable::removeLocalVariable(int scopeIndex, const std::string& name) {
-    // Erase a variable from a function scope and reclaim its stack slot. Local addresses
-    // are frame-relative (params first at 0..argc-1, then locals), and the frame size is
-    // this scope's addressCounter. To free the slot we compact: every variable addressed
-    // ABOVE the removed one shifts down by one, and the slot count drops by one.
-    //
-    // Parameters need no special handling: they hold the lowest addresses, so they are all
-    // below any local and are never shifted. Code generation looks up each variable's
-    // address fresh from this table, so the renumbering is picked up consistently.
     if (scopeIndex < 0 || scopeIndex >= static_cast<int>(scopes.size())) return false;
     auto& scope = scopes[scopeIndex];
     auto it = scope.symbols.find(name);

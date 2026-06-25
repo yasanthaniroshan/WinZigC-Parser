@@ -124,13 +124,14 @@ add_executable(tests
     tests/unit/test_analyzer.cpp
     tests/unit/test_symbol_table.cpp
     tests/unit/test_code_generator.cpp
+    tests/unit/test_optimizer.cpp
 )
 target_compile_definitions(tests PRIVATE
     TEST_GRAMMAR_DIR="${CMAKE_SOURCE_DIR}/tests/grammar"
     TEST_INTEGRATION_DIR="${CMAKE_SOURCE_DIR}/tests/integration"
 )
 # code_generator pulls in semantic_analyzer (and the rest of the pipeline) transitively.
-target_link_libraries(tests PRIVATE gtest_main utils code_generator)
+target_link_libraries(tests PRIVATE gtest_main utils code_generator optimizer)
 
 include(GoogleTest)
 gtest_discover_tests(tests)
@@ -161,6 +162,25 @@ if(Python3_Interpreter_FOUND)
                     --expected ${CMAKE_SOURCE_DIR}/tests/${_dir}/${_name}.out
                     ${_stdin_arg})
         endforeach()
+    endforeach()
+
+    # Optimization suite: each program is compiled at BOTH -O O0 and -O O1 and
+    # must produce the expected output at both levels AND agree with itself,
+    # so any optimization that changes behavior fails the test.
+    file(GLOB _opt_cases ${CMAKE_SOURCE_DIR}/tests/optimization/*.winzig)
+    foreach(_case ${_opt_cases})
+        get_filename_component(_name ${_case} NAME_WE)
+        set(_stdin_arg "")
+        if(EXISTS ${CMAKE_SOURCE_DIR}/tests/optimization/${_name}.in)
+            set(_stdin_arg --stdin ${CMAKE_SOURCE_DIR}/tests/optimization/${_name}.in)
+        endif()
+        add_test(NAME optimization_${_name}
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/optimization/run_opt_case.py
+                --winzigc $<TARGET_FILE:winzigc>
+                --machine ${CMAKE_SOURCE_DIR}/scripts/machine.py
+                --source ${_case}
+                --expected ${CMAKE_SOURCE_DIR}/tests/optimization/${_name}.out
+                ${_stdin_arg})
     endforeach()
 endif()
 

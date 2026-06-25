@@ -92,7 +92,6 @@ int main(int argc, char** argv) {
         LOG_ERROR(optimizationResult.error_message.value());
         return 1;
     }
-    // Use the optimizer's symbol table (dead globals removed) so they drop out of .data.
     auto codeGenerator = CodeGenerator(optimizationResult.value.value(), optimizer.getSymbolTable(), result.outputFile);
     auto codeGenerationResult = codeGenerator.generate();
     if (!codeGenerationResult.success) {
