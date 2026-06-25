@@ -1,5 +1,7 @@
 #include "semantic_analyzer/symbol.h"
 
+#include <algorithm>
+
 SymbolTable::SymbolTable() {
     // Start with a global scope (index 0, no parent).
     scopes.emplace_back();
@@ -41,6 +43,21 @@ void SymbolTable::exitScope() {
 int SymbolTable::scopeLocalCount(int index) const {
     if (index < 0 || index >= static_cast<int>(scopes.size())) return 0;
     return scopes[index].addressCounter;
+}
+
+std::vector<std::pair<std::string, int>> SymbolTable::globalVariables() const {
+    // Scope 0 is the program (global) scope. Return its variables (name, address),
+    // ordered by address so the emitted .data section reads top-to-bottom.
+    std::vector<std::pair<std::string, int>> result;
+    if (scopes.empty()) return result;
+    for (const auto& entry : scopes[0].symbols) {
+        if (entry.second.kind == SymbolKind::Variable) {
+            result.emplace_back(entry.first, entry.second.address);
+        }
+    }
+    std::sort(result.begin(), result.end(),
+              [](const auto& a, const auto& b) { return a.second < b.second; });
+    return result;
 }
 
 bool SymbolTable::declare(const Symbol& sym) {
