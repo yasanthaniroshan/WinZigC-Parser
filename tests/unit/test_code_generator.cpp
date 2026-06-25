@@ -68,9 +68,11 @@ std::vector<std::string> generateAsm(const std::string& source) {
     std::ifstream in(outPath);
     std::string line;
     while (std::getline(in, line)) {
+        // Trim trailing CR/space and leading indentation so assertions can match instruction text regardless of the assembly file's layout.
         while (!line.empty() && (line.back() == '\r' || line.back() == ' '))
             line.pop_back();
-        if (!line.empty()) lines.push_back(line);
+        size_t start = line.find_first_not_of(" \t");
+        if (start != std::string::npos) lines.push_back(line.substr(start));
     }
 
     delete root;
@@ -108,9 +110,9 @@ TEST(CodeGeneratorFrameTest, GlobalsUseAbsoluteAddressingAndNoFrameOps) {
         "    output(y);\n"
         "end p.\n");
 
-    EXPECT_TRUE(hasLine(asmLines, "save 0"));   // x
-    EXPECT_TRUE(hasLine(asmLines, "save 1"));   // y
-    EXPECT_TRUE(hasLine(asmLines, "load 0"));   // read x
+    EXPECT_TRUE(hasLine(asmLines, "save x"));   // globals referenced by name
+    EXPECT_TRUE(hasLine(asmLines, "save y"));
+    EXPECT_TRUE(hasLine(asmLines, "load x"));
 
     EXPECT_FALSE(hasOpcode(asmLines, "save_local"));
     EXPECT_FALSE(hasOpcode(asmLines, "load_local"));
@@ -136,7 +138,7 @@ TEST(CodeGeneratorFrameTest, ParameterOnlyFunctionEntersWithoutReserve) {
     EXPECT_TRUE(hasLine(asmLines, "enter 1"));
     EXPECT_FALSE(hasOpcode(asmLines, "reserve"));
     EXPECT_TRUE(hasLine(asmLines, "load_local 0"));  // param a
-    EXPECT_TRUE(hasLine(asmLines, "save 0"));        // global g (absolute)
+    EXPECT_TRUE(hasLine(asmLines, "save g"));        // global g (absolute, by name)
 }
 
 // A function with a local variable reserves space for it; the parameter is
@@ -180,7 +182,7 @@ TEST(CodeGeneratorFrameTest, FunctionAssignsGlobalWithAbsoluteSave) {
         "end p.\n");
 
     EXPECT_TRUE(hasLine(asmLines, "load_local 0"));  // read param a (frame-relative)
-    EXPECT_TRUE(hasLine(asmLines, "save 0"));        // write global g (absolute)
+    EXPECT_TRUE(hasLine(asmLines, "save g"));        // write global g (absolute, by name)
     // The parameter is only read, never written, so there is no save_local.
     EXPECT_FALSE(hasOpcode(asmLines, "save_local"));
 }
@@ -228,4 +230,46 @@ TEST(CodeGeneratorFrameTest, LocalIndicesResetPerFunctionScope) {
 
     EXPECT_EQ(countLine(asmLines, "enter 1"), 2);        // one prologue per function
     EXPECT_EQ(countLine(asmLines, "load_local 0"), 2);   // both params are slot 0
+}
+
+// The assembly is laid out in sections with named labels: globals in .data,
+// string literals in .rodata, code in .text; functions and branch targets are
+// labels (not raw line numbers), and execution begins at `main`.
+TEST(CodeGeneratorFrameTest, EmitsSectionsAndNamedLabels) {
+    auto asmLines = generateAsm(
+        "program p:\n"
+        "var g : integer;\n"
+        "function f(a:integer):integer;\n"
+        "begin\n"
+        "    if a > 0 then return (a) else return (0);\n"
+        "end f;\n"
+        "begin\n"
+        "    g := f(3);\n"
+        "    output(\"g=\", g);\n"
+        "end p.\n");
+
+    // Sections present.
+    EXPECT_TRUE(hasLine(asmLines, ".data"));
+    EXPECT_TRUE(hasLine(asmLines, ".rodata"));
+    EXPECT_TRUE(hasLine(asmLines, ".text"));
+    EXPECT_TRUE(hasLine(asmLines, ".globl main"));
+
+    // Named labels: a global declaration, the entry, and the function.
+    EXPECT_TRUE(hasLine(asmLines, "g: 0"));
+    EXPECT_TRUE(hasLine(asmLines, "main:"));
+    EXPECT_TRUE(hasLine(asmLines, "f:"));
+
+    // The call and the string reference labels, not numbers.
+    EXPECT_TRUE(hasLine(asmLines, "call f"));
+    EXPECT_TRUE(hasOpcode(asmLines, "lits"));  // lits .LC0
+
+    // Every branch/call target is a label, never a bare line number.
+    for (const auto& l : asmLines) {
+        if (l.rfind("goto ", 0) == 0 || l.rfind("iffalse ", 0) == 0 ||
+            l.rfind("iftrue ", 0) == 0 || l.rfind("call ", 0) == 0) {
+            std::string operand = l.substr(l.find(' ') + 1);
+            EXPECT_FALSE(std::all_of(operand.begin(), operand.end(), ::isdigit))
+                << "jump/call target should be a label, got: " << l;
+        }
+    }
 }

@@ -39,31 +39,24 @@ class Op(enum.Enum):
     
 
 class StackMachine:
-    def __init__(self, code, stack_size=1000):
+    def __init__(self, code, num_globals=0, start=0, stack_size=1000):
+        # `code` is the fully resolved instruction list (labels already turned into
+        # 1-based indices, globals into slots, string labels into text) produced by
+        # `assemble()`. The execution engine itself is unchanged.
         self.code = code
         self.stack = [0] * stack_size
         self.call_stack = [] # for tracking function calls
 
-        # Variables live at the bottom of the stack at the absolute addresses
-        # assigned by the code generator (referenced by `save n` / `load n`).
-        # The operand stack must start ABOVE this region, otherwise pushed
-        # operands clobber variables (and vice-versa). Reserve one slot per
-        # variable address by starting `top` at the highest address used.
-        max_addr = -1
-        for instr in code:
-            if instr[0] in ("save", "load") and instr[1] is not None:
-                try:
-                    max_addr = max(max_addr, int(instr[1]))
-                except ValueError:
-                    pass
-        self.top = max_addr # slots 0..max_addr are reserved for GLOBAL variables
+        # The bottom `num_globals` slots (declared in the .data section) are
+        # reserved for global variables; the operand stack must start ABOVE them.
+        self.top = num_globals - 1
         # Frame pointer: base of the current function's activation frame. Globals
-        # (save/load) stay absolute; function params/locals (save_local/load_local)
-        # are addressed as stack[fp + index]. `fp` is set on every `enter`, saved
-        # on `call`, and restored on `return`. The first free slot above the global
-        # region is the initial base for the main program's nested calls.
-        self.fp = max_addr + 1
-        self.pc = 0
+        # (save/load) are absolute slots; function params/locals (save_local/
+        # load_local) are stack[fp + index]. `fp` is set on every `enter`, saved on
+        # `call`, restored on `return`. The first free slot above the global region
+        # is the initial base for the main program's nested calls.
+        self.fp = num_globals
+        self.pc = start # execution begins at the `main` label
         self.input_ptr = 0
 
     def push(self, value):
@@ -257,23 +250,88 @@ class StackMachine:
 
 
 
+JUMP_OPS = ("goto", "iffalse", "iftrue", "call")
+MEM_OPS = ("save", "load")
+
+
+def assemble(asm_file):
+    """Two-pass assembler for the sectioned, labeled .asm format.
+
+    The file is organised into sections:
+        .data    - one global variable per line ("name: 0")
+        .rodata  - string literals (".LC0: \"text\"")
+        .text    - code, with `.globl`, `label:` lines and instructions
+    Pass 1 collects section contents and records the index of every code label.
+    Pass 2 resolves operands back to the plain numeric form the engine runs:
+    jump/call targets -> 1-based instruction index, save/load -> global slot,
+    lits -> the literal text. Returns (code, num_globals, start_index).
+    """
+    section = None
+    data_names = []      # global variable names, in declaration order
+    rodata = {}          # .LC label -> string text
+    raw = []             # ("label", name) | ("instr", op, operand) in .text order
+
+    with open(asm_file) as f:
+        for line in f:
+            line = line.split("#", 1)[0].strip()  # strip comments / whitespace
+            if not line:
+                continue
+            if line in (".data", ".rodata", ".text"):
+                section = line
+                continue
+            if line.startswith(".globl"):
+                continue  # entry point is the `main` label; nothing to do
+            if section == ".data":
+                data_names.append(line.split(":", 1)[0].strip())
+                continue
+            if section == ".rodata":
+                label, _, text = line.partition(":")
+                text = text.strip()
+                if len(text) >= 2 and text[0] == '"' and text[-1] == '"':
+                    text = text[1:-1]
+                rodata[label.strip()] = text
+                continue
+            # .text
+            if line.endswith(":"):
+                raw.append(("label", line[:-1]))
+                continue
+            parts = line.split()
+            op = parts[0]
+            operand = " ".join(parts[1:]) if len(parts) > 1 else None
+            raw.append(("instr", op, operand))
+
+    # Pass 1: flatten instructions and record label -> instruction index.
+    code = []
+    labels = {}
+    for item in raw:
+        if item[0] == "label":
+            labels[item[1]] = len(code)
+        else:
+            code.append([item[1], item[2]])
+
+    slot = {name: i for i, name in enumerate(data_names)}
+
+    # Pass 2: resolve operands to the numeric form the engine expects.
+    resolved = []
+    for op, operand in code:
+        if op in JUMP_OPS:
+            resolved.append((op, str(labels[operand] + 1)))  # engine does int(n) - 1
+        elif op in MEM_OPS:
+            resolved.append((op, str(slot[operand])))
+        elif op == "lits":
+            resolved.append((op, rodata.get(operand, operand)))
+        else:
+            resolved.append((op, operand))
+
+    return resolved, len(data_names), labels.get("main", 0)
+
+
 if __name__ == "__main__":
     if len(sys.argv) != 2:
         print("Usage: python3 machine.py [program.asm]")
         sys.exit(1)
-    asm_file = sys.argv[1]
-    program = []
-    with open(asm_file) as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-            parts = line.split()
-            op = parts[0]
-            # args = tuple(x for x in parts[1:]) if len(parts) > 1 else ()
-            args = " ".join(parts[1:]) if len(parts) > 1 else None
-            program.append((op, args))
-    machine = StackMachine(program)
+    program, num_globals, start = assemble(sys.argv[1])
+    machine = StackMachine(program, num_globals, start)
     try:
         machine.run()
     except (RuntimeError, ZeroDivisionError) as e:

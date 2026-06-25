@@ -2,6 +2,66 @@
 
 The following is the stack machine instruction set which we generate for programs in WinZigC. 
 
+## Assembly file format (sections and labels)
+
+The generated `.asm` file is organised into **sections** and uses **named labels**
+instead of raw instruction numbers. The instruction set itself is unchanged — this
+is purely the surface form. A small two-pass assembler in `scripts/machine.py`
+resolves the file into the numeric model the engine runs (labels → instruction
+indices, global names → stack slots, string labels → text), then begins execution
+at the `main` label.
+
+```
+.data                 ; global variables, one slot each
+g: 0
+
+.rodata               ; string literals (only emitted if the program has any)
+.LC0: "g="
+
+.text                 ; code
+.globl main           ; entry point
+
+square:               ; a function label (call target)
+	enter 1
+	load_local 0
+	load_local 0
+	multiply
+	return
+	lit 0
+	return
+
+main:                 ; execution starts here
+	lit 5
+	save g            ; globals are referenced by NAME...
+	load g
+	call square       ; ...functions by their label...
+	print
+	stop
+```
+
+Sections:
+
+| Section | Holds | How operands reference it |
+|---------|-------|---------------------------|
+| `.data`   | global variables (`name: 0`), one stack slot each | `save name` / `load name` |
+| `.rodata` | string literals (`.LCn: "text"`) | `lits .LCn` |
+| `.text`   | code, introduced by `.globl main` | — |
+
+Labels (a line ending in `:`):
+
+- **Function labels** are the function names; `call <func>` targets them.
+- **Branch labels** are generated (`.L0`, `.L1`, …); `goto`/`iffalse`/`iftrue`
+  target them instead of line numbers.
+- **`main`** marks the program body; execution begins there (the file lists
+  functions first, then `main`).
+
+Operands that are **not** labels/names stay numeric: `lit <int>`, the frame
+indices in `enter <argc>` / `reserve <nvars>` / `save_local <i>` / `load_local <i>`.
+
+The pseudo-code below describes the **resolved execution model** (after the
+assembler has turned labels/names back into numeric targets and slots), so
+`goto n`, `save n`, etc. show numeric operands.
+
 The instruction-set is presented as pseudo-code here:
 
 ```

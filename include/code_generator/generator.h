@@ -48,7 +48,7 @@ public:
             LOG_ERROR("Failed to open output file: " + outputFile);
             return;
         }
-        for (const auto& line : generatedCode) {
+        for (const auto& line : assembleSectioned()) {
             outFile << line << std::endl;
         }
         LOG_DEBUG("Generated code saved to " + outputFile);
@@ -59,8 +59,14 @@ private:
     SymbolTable symbolTable; // The symbol table for code generation.
     std::string outputFile; // The output file for the generated code
     std::vector<std::string> generatedCode; // Store generated code lines
-    std::vector<std::vector<int>> exitPatchStack; // for tracking nested loops for loop..pool-exit 
+    std::vector<std::vector<int>> exitPatchStack; // for tracking nested loops for loop..pool-exit
     std::unordered_map<std::string, int> functionAddresses; // tracks starting instr index of each function
+    std::vector<std::pair<std::string, std::string>> stringLiterals; // (.rodata label, text) for output strings
+
+    // Transform the flat, line-numbered instruction stream into a sectioned,
+    // labeled assembly file (.data / .rodata / .text with named labels) without
+    // changing the instruction set. See generator.cpp.
+    std::vector<std::string> assembleSectioned() const;
     Result<CodeResult> generateProgram(TreeNode* node, CodeInput input = CodeInput(0, 0));
     Result<CodeResult> generateConsts(TreeNode* node, CodeInput input = CodeInput(0, 0));
     Result<CodeResult> generateTypes(TreeNode* node, CodeInput input = CodeInput(0, 0));
