@@ -30,6 +30,11 @@ class Op(enum.Enum):
     RETURN = "return"
     LITS = "lits"
     PRINTS = "prints"
+    # Frame-relative addressing (function locals)
+    ENTER = "enter"           # fp := top - argc + 1  (incoming args become the first frame slots)
+    RESERVE = "reserve"       # top += nvars          (reserve space for non-param locals)
+    SAVE_LOCAL = "save_local" # stack[fp + i] := pop()
+    LOAD_LOCAL = "load_local" # push(stack[fp + i])
 
     
 
@@ -51,12 +56,24 @@ class StackMachine:
                     max_addr = max(max_addr, int(instr[1]))
                 except ValueError:
                     pass
-        self.top = max_addr # slots 0..max_addr are reserved for variables
+        self.top = max_addr # slots 0..max_addr are reserved for GLOBAL variables
+        # Frame pointer: base of the current function's activation frame. Globals
+        # (save/load) stay absolute; function params/locals (save_local/load_local)
+        # are addressed as stack[fp + index]. `fp` is set on every `enter`, saved
+        # on `call`, and restored on `return`. The first free slot above the global
+        # region is the initial base for the main program's nested calls.
+        self.fp = max_addr + 1
         self.pc = 0
         self.input_ptr = 0
 
     def push(self, value):
         self.top += 1
+        if self.top >= len(self.stack):
+            # Out of stack slots: almost always unbounded or too-deep recursion.
+            # Raise a clear message instead of a bare IndexError from the list.
+            raise RuntimeError(
+                "Stack overflow: exceeded {} stack slots "
+                "(too-deep or unbounded recursion?)".format(len(self.stack)))
         self.stack[self.top] = value
 
     def pop(self):
@@ -115,8 +132,11 @@ class StackMachine:
                     self.print_integer()
 
                 elif op == Op.LIT:
+                    # `lit` always carries an integer operand (the parser hands it
+                    # to us as a string). Push it as an int so values flowing
+                    # through save/load keep comparing correctly in iffalse/iftrue.
                     n = instr[1]
-                    self.push(n)
+                    self.push(int(n))
 
                 elif op == Op.GOTO:
                     n = instr[1]
@@ -125,13 +145,13 @@ class StackMachine:
 
                 elif op == Op.IFFALSE:
                     n = instr[1]
-                    if self.pop() == 0:
+                    if int(self.pop()) == 0:
                         self.pc = int(n) - 1
                         continue
 
                 elif op == Op.IFTRUE:
                     n = instr[1]
-                    if self.pop() == 1:
+                    if int(self.pop()) == 1:
                         self.pc = int(n) - 1
                         continue
 
@@ -182,14 +202,40 @@ class StackMachine:
                 
                 elif op == Op.CALL:
                     n = instr[1] # second element is the instruction address of funciton
-                    self.call_stack.append(self.pc + 1) # self.pc is the CALL instruction - return to immediately after it
-                    self.pc = int(n) - 1 
+                    # Save the return address AND the caller's frame pointer so the
+                    # callee's `enter`/`return` can rebase without losing the caller.
+                    self.call_stack.append((self.pc + 1, self.fp))
+                    self.pc = int(n) - 1
                     continue # don't increment PC
-                
+
+                elif op == Op.ENTER:
+                    # Incoming arguments (pushed by the caller) occupy the top `argc`
+                    # operand slots. They become the first slots of this frame.
+                    argc = int(instr[1])
+                    self.fp = self.top - argc + 1
+
+                elif op == Op.RESERVE:
+                    # Reserve slots for the function's non-parameter locals, lifting
+                    # the operand stack above the whole frame.
+                    self.top += int(instr[1])
+
+                elif op == Op.SAVE_LOCAL:
+                    i = int(instr[1])
+                    self.stack[self.fp + i] = self.pop()
+
+                elif op == Op.LOAD_LOCAL:
+                    i = int(instr[1])
+                    self.push(self.stack[self.fp + i])
+
                 elif op == Op.RETURN:
                     if not self.call_stack:
                         raise RuntimeError("Return called with empty call stack")
-                    self.pc = self.call_stack.pop()
+                    retval = self.pop()                  # function result sits on top
+                    ret_addr, old_fp = self.call_stack.pop()
+                    self.top = self.fp - 1               # discard the whole frame (incl. args)
+                    self.fp = old_fp                     # restore the caller's frame
+                    self.push(retval)                    # leave result on caller's stack
+                    self.pc = ret_addr
                     continue # do not increment
 
                 elif op == Op.LITS:
@@ -228,4 +274,10 @@ if __name__ == "__main__":
             args = " ".join(parts[1:]) if len(parts) > 1 else None
             program.append((op, args))
     machine = StackMachine(program)
-    machine.run()
+    try:
+        machine.run()
+    except (RuntimeError, ZeroDivisionError) as e:
+        # Report runtime faults (stack overflow, bad PC, division by zero, ...)
+        # as a clean one-line message rather than a Python traceback.
+        print("Runtime error: {}".format(e), file=sys.stderr)
+        sys.exit(1)

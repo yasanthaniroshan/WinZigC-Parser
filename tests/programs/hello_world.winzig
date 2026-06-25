@@ -1,0 +1,4 @@
+program hello_world:
+begin
+  output("Hello World");
+end hello_world.

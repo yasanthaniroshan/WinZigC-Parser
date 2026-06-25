@@ -1,0 +1,21 @@
+program russian_peasant:
+var a, b : integer;
+function mult(a, b : integer):integer;
+var r : integer;
+begin
+  r := 0;
+  while a > 0 do begin
+    if a mod 2 = 1 then r := r + b;
+    a := a / 2;
+    b := b * 2;
+  end;
+  return (r);
+end mult;
+begin
+  read(a);
+  while a > 0 do begin
+    read(b);
+    output(mult(a, b));
+    read(a);
+  end;
+end russian_peasant.

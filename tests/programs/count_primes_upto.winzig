@@ -1,0 +1,26 @@
+program count_primes_upto:
+# count of primes <= n
+var x : integer;
+function f(n:integer):integer;
+var k, i, c : integer;
+    prime : boolean;
+begin
+  c := 0; k := 2;
+  while k <= n do begin
+    prime := true; i := 2;
+    while (i * i <= k) and prime do begin
+      if k mod i = 0 then prime := false;
+      i := i + 1;
+    end;
+    if prime then c := c + 1;
+    k := k + 1;
+  end;
+  return (c);
+end f;
+begin
+  read(x);
+  while x > 0 do begin
+    output(f(x));
+    read(x);
+  end;
+end count_primes_upto.

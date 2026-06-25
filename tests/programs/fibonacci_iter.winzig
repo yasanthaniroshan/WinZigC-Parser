@@ -1,0 +1,21 @@
+program fibonacci_iter:
+var x : integer;
+function fib(n:integer):integer;
+var a, b, t, i : integer;
+begin
+  a := 0; b := 1; i := 0;
+  while i < n do begin
+    t := a + b;
+    a := b;
+    b := t;
+    i := i + 1;
+  end;
+  return (a);
+end fib;
+begin
+  read(x);
+  while x > 0 do begin
+    output(fib(x));
+    read(x);
+  end;
+end fibonacci_iter.

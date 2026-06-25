@@ -1,0 +1,19 @@
+program lcm:
+var a, b : integer;
+function gcd(a, b : integer):integer;
+begin
+  if b = 0 then return (a)
+  else return (gcd(b, a mod b));
+end gcd;
+function lcm(a, b : integer):integer;
+begin
+  return (a / gcd(a, b) * b);
+end lcm;
+begin
+  read(a);
+  while a > 0 do begin
+    read(b);
+    output(lcm(a, b));
+    read(a);
+  end;
+end lcm.

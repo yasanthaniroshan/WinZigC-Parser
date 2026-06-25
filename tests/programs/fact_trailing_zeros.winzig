@@ -1,0 +1,20 @@
+program fact_trailing_zeros:
+# trailing zeros of n!
+var x : integer;
+function f(n:integer):integer;
+var c, p : integer;
+begin
+  c := 0; p := 5;
+  while p <= n do begin
+    c := c + n / p;
+    p := p * 5;
+  end;
+  return (c);
+end f;
+begin
+  read(x);
+  while x > 0 do begin
+    output(f(x));
+    read(x);
+  end;
+end fact_trailing_zeros.

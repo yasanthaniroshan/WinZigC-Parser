@@ -1,0 +1,11 @@
+program labeled_output:
+# Mix string labels with integer expressions in a single output statement.
+var a, b : integer;
+begin
+  read(a);
+  read(b);
+  output("a=", a);
+  output("b=", b);
+  output("sum=", a + b);
+  output("product=", a * b);
+end labeled_output.

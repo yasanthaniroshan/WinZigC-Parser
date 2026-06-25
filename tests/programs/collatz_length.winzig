@@ -1,0 +1,21 @@
+program collatz_length:
+# Collatz steps to reach 1
+var x : integer;
+function f(n:integer):integer;
+var s : integer;
+begin
+  s := 0;
+  while n <> 1 do begin
+    if n mod 2 = 0 then n := n / 2
+    else n := 3 * n + 1;
+    s := s + 1;
+  end;
+  return (s);
+end f;
+begin
+  read(x);
+  while x > 0 do begin
+    output(f(x));
+    read(x);
+  end;
+end collatz_length.

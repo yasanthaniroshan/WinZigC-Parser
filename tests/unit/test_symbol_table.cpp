@@ -110,6 +110,32 @@ TEST(SymbolTableTest, ReenterScopeReturnsToAPreviouslyCreatedScope) {
     EXPECT_EQ(table.currentScopeIndex(), child);
 }
 
+TEST(SymbolTableTest, VariablesRecordTheirOwningScope) {
+    SymbolTable table;
+    table.declare(makeVar("g", SymbolType::Integer));  // global scope (0)
+    EXPECT_EQ(table.lookup("g")->scopeIndex, 0);
+
+    int inner = table.enterScope();
+    table.declare(makeVar("local", SymbolType::Integer));
+    EXPECT_EQ(table.lookup("local")->scopeIndex, inner);  // distinguishes locals from globals
+    table.exitScope();
+}
+
+TEST(SymbolTableTest, ScopeLocalCountTracksReservedSlots) {
+    SymbolTable table;
+    table.declare(makeVar("a", SymbolType::Integer));
+    table.declare(makeVar("b", SymbolType::Integer));
+
+    int fn = table.enterScope();           // a function's body scope
+    table.declare(makeVar("p", SymbolType::Integer));  // parameter -> slot 0
+    table.declare(makeVar("v", SymbolType::Integer));  // local     -> slot 1
+    table.exitScope();
+
+    EXPECT_EQ(table.scopeLocalCount(0), 2);    // two globals
+    EXPECT_EQ(table.scopeLocalCount(fn), 2);   // param + local
+    EXPECT_EQ(table.scopeLocalCount(999), 0);  // out-of-range is harmless
+}
+
 TEST(SymbolTableTest, PrintHelpersRunWithoutCrashing) {
     SymbolTable table;
     Symbol type("Color", SymbolType::UserDefined);

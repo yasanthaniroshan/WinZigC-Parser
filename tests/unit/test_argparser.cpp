@@ -22,7 +22,7 @@ TEST_F(ArgParserTest, VersionFlag) {
 TEST_F(ArgParserTest, LogLevelOption) {
     const char* argv[] = {"winzigc", "-l", "DEBUG", "input.txt"};
     int argc = 4;
-    auto expected = Result<ArgParserResult>::Ok(ArgParserResult("input.txt", "input.asm"));
+    auto expected = Result<ArgParserResult>::Ok(ArgParserResult("input.txt", "output.asm"));
     EXPECT_EQ(ArgParser(argc, (char**)argv).parse(), expected);
     EXPECT_EQ(Logger::getLevel(), spdlog::level::debug);
 }
@@ -50,7 +50,7 @@ TEST_F(ArgParserTest, PositionalInputIsParsed) {
     ASSERT_TRUE(r.success);
     ASSERT_TRUE(r.value.has_value());
     EXPECT_EQ(r.value->inputFile, "src.winzig");
-    EXPECT_EQ(r.value->outputFile, "src.asm");
+    EXPECT_EQ(r.value->outputFile, "output.asm");
     EXPECT_FALSE(r.value->showVersion);
     EXPECT_FALSE(r.value->printAbstractSyntaxTree);
 }

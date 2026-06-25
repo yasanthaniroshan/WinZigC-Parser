@@ -1,0 +1,17 @@
+program gcd_subtract:
+var a, b : integer;
+function gcd(a, b : integer):integer;
+begin
+  while a <> b do begin
+    if a > b then a := a - b else b := b - a;
+  end;
+  return (a);
+end gcd;
+begin
+  read(a);
+  while a > 0 do begin
+    read(b);
+    output(gcd(a, b));
+    read(a);
+  end;
+end gcd_subtract.

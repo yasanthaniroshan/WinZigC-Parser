@@ -88,6 +88,11 @@ private:
     void emit (const std::string& instr);
     void emit (const std::string& instr, int operand);
     void emit (const std::string& intr, const std::string& operand);
+
+    // Variable access. Globals (scope 0) use absolute save/load; function
+    // params/locals use frame-relative save_local/load_local (stack[fp + address]).
+    void emitVarLoad(const Symbol* sym);
+    void emitVarSave(const Symbol* sym);
 };
 
 #endif // CODE_GENERATOR_H

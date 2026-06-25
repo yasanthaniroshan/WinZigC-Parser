@@ -1,0 +1,19 @@
+program gcd_of_list:
+# Read a count, then that many numbers; print the gcd of all of them.
+var count, i, x, g : integer;
+function gcd(a, b : integer):integer;
+begin
+  if b = 0 then return (a)
+  else return (gcd(b, a mod b));
+end gcd;
+begin
+  read(count);
+  read(g);
+  i := 1;
+  while i < count do begin
+    read(x);
+    g := gcd(g, x);
+    i := i + 1;
+  end;
+  output(g);
+end gcd_of_list.

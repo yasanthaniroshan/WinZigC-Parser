@@ -85,7 +85,7 @@ int main(int argc, char** argv) {
         LOG_ERROR(semanticResult.error_message.value());
         return 1;
     }
-    auto codeGenerator = CodeGenerator(parserResult.value.value(), semanticAnalyzer.getSymbolTable());
+    auto codeGenerator = CodeGenerator(parserResult.value.value(), semanticAnalyzer.getSymbolTable(), result.outputFile);
     auto codeGenerationResult = codeGenerator.generate();
     if (!codeGenerationResult.success) {
         LOG_ERROR(codeGenerationResult.error_message.value());

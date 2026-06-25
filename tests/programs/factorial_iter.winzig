@@ -1,0 +1,19 @@
+program factorial_iter:
+var x : integer;
+function fact(n:integer):integer;
+var i, f : integer;
+begin
+  f := 1; i := 2;
+  while i <= n do begin
+    f := f * i;
+    i := i + 1;
+  end;
+  return (f);
+end fact;
+begin
+  read(x);
+  while x > 0 do begin
+    output(fact(x));
+    read(x);
+  end;
+end factorial_iter.

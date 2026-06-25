@@ -1,0 +1,23 @@
+program modpow:
+var b, e, m : integer;
+function modpow(b, e, m : integer):integer;
+var r : integer;
+begin
+  r := 1;
+  b := b mod m;
+  while e > 0 do begin
+    if e mod 2 = 1 then r := r * b mod m;
+    b := b * b mod m;
+    e := e / 2;
+  end;
+  return (r);
+end modpow;
+begin
+  read(b);
+  while b > 0 do begin
+    read(e);
+    read(m);
+    output(modpow(b, e, m));
+    read(b);
+  end;
+end modpow.

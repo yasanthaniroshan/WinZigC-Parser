@@ -1,0 +1,20 @@
+program count_digits:
+# number of decimal digits
+var x : integer;
+function f(n:integer):integer;
+var c : integer;
+begin
+  c := 0;
+  while n > 0 do begin
+    c := c + 1;
+    n := n / 10;
+  end;
+  return (c);
+end f;
+begin
+  read(x);
+  while x > 0 do begin
+    output(f(x));
+    read(x);
+  end;
+end count_digits.

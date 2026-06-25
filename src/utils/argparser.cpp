@@ -59,8 +59,7 @@ Result<ArgParserResult> ArgParser::parse() {
         LOG_ERROR("Input file is required");
         return Result<ArgParserResult>::Err(ArgParserError("Input file is required"));
     }
-    std::string output_file = _inputFileStr.substr(0, _inputFileStr.find_last_of('.')) + ".asm";
-    std::string output = _outputFileStr.empty() ? output_file : _outputFileStr;
+    std::string output = _outputFileStr.empty() ? "output.asm" : _outputFileStr;
     return Result<ArgParserResult>::Ok(ArgParserResult(_inputFileStr, output, printAbstractSyntaxTree));
 }
 

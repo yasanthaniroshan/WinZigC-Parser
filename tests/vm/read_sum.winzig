@@ -1,0 +1,18 @@
+program read_sum:
+
+# Exercises `read` into globals plus a function reading a global (b) alongside
+# its own parameter (x).
+
+var a : integer;
+    b : integer;
+
+function add(x:integer):integer;
+begin
+    return (x + b);
+end add;
+
+begin
+    read(a);
+    read(b);
+    output(add(a));
+end read_sum.
