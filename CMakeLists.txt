@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(WinZigCParser VERSION 1.0.0)
+project(WinZigCParser VERSION 2.1.0)
 enable_testing()
 
 set(CMAKE_CXX_STANDARD 17)
@@ -86,11 +86,17 @@ target_include_directories(semantic_analyzer PUBLIC
 )
 target_link_libraries(semantic_analyzer PUBLIC common winzig_log tree tokenizer parser)
 
+add_library(optimizer src/optimizer/optimizer.cpp)
+target_include_directories(optimizer PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+)
+target_link_libraries(optimizer PUBLIC common winzig_log tree tokenizer parser semantic_analyzer)
+
 add_library(code_generator src/code_generator/generator.cpp)
 target_include_directories(code_generator PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 )
-target_link_libraries(code_generator PUBLIC common winzig_log tree tokenizer parser semantic_analyzer)
+target_link_libraries(code_generator PUBLIC common winzig_log tree tokenizer parser semantic_analyzer )
 add_library(utils
     src/utils/argparser.cpp
     src/utils/filereader.cpp
@@ -103,7 +109,7 @@ target_link_libraries(utils PUBLIC common winzig_log CLI11::CLI11)
 
 # --- Executables ---
 add_executable(winzigc app/main.cpp)
-target_link_libraries(winzigc PRIVATE utils code_generator)
+target_link_libraries(winzigc PRIVATE utils optimizer code_generator)
 
 add_executable(tests
     tests/unit/test_argparser.cpp

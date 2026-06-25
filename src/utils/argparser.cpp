@@ -8,6 +8,7 @@ ArgParser::ArgParser(int argc, char** argv)
     _app->add_option("-o,--output-file", _outputFileStr, "Set output file");
     // Long names must use "--" in CLI11; course scripts use "-ast" — normalize in main() before parse
     _app->add_flag("-a,--ast", _abstractSyntaxTree, "Print Abstract Syntax Tree");
+    _app->add_option("-O,--optimization-level", _optimizationLevelStr, "Set optimization level (O0, O1, O2)");
     auto* inputOpt = _app->add_option("input", _inputFileStr, "Input file");
     inputOpt->required(false);
 }
@@ -61,7 +62,8 @@ Result<ArgParserResult> ArgParser::parse() {
     }
     std::string output_file = _inputFileStr.substr(0, _inputFileStr.find_last_of('.')) + ".asm";
     std::string output = _outputFileStr.empty() ? output_file : _outputFileStr;
-    return Result<ArgParserResult>::Ok(ArgParserResult(_inputFileStr, output, printAbstractSyntaxTree));
+    std::string optimizationLevel = _optimizationLevelStr.empty() ? "O1" : _optimizationLevelStr;
+    return Result<ArgParserResult>::Ok(ArgParserResult(_inputFileStr, output, printAbstractSyntaxTree, optimizationLevel));
 }
 
 ArgParser::~ArgParser() = default;

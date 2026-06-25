@@ -25,6 +25,7 @@ struct ArgParserResult {
     std::string outputFile = "output.txt";
     std::string logLevel = "INFO";
     std::string logFile = "logs/argparser.log";
+    std::string optimizationLevel = "O1";
     bool showVersion = false;
     bool printAbstractSyntaxTree = false;
 
@@ -33,7 +34,7 @@ struct ArgParserResult {
     }
 
     ArgParserResult(const std::string& inputFile, const std::string& outputFile) : inputFile(inputFile), outputFile(outputFile) {}
-    ArgParserResult(const std::string& inputFile, const std::string& outputFile, bool printAbstractSyntaxTree) : inputFile(inputFile), outputFile(outputFile), printAbstractSyntaxTree(printAbstractSyntaxTree) {}
+    ArgParserResult(const std::string& inputFile, const std::string& outputFile, bool printAbstractSyntaxTree, const std::string& optimizationLevel) : inputFile(inputFile), outputFile(outputFile), printAbstractSyntaxTree(printAbstractSyntaxTree), optimizationLevel(optimizationLevel) {}
 };
 
 struct ArgParserError : public Error {
@@ -59,6 +60,7 @@ private:
     std::string _logLevelStr;
     std::string _inputFileStr;
     std::string _outputFileStr;
+    std::string _optimizationLevelStr;
     CLI::Option* _logLevelOpt = nullptr;
 };
 

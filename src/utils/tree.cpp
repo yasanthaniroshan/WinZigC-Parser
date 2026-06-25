@@ -1,6 +1,7 @@
 #include "utils/tree.h"
 #include <iostream>
 #include <sstream>
+#include <utility>
 
 int countChildren(TreeNode* node) {
     int n = 0;
@@ -28,4 +29,61 @@ std::string treeToString(TreeNode* node, int depth) {
     std::ostringstream out;
     appendTreeLines(node, depth, out);
     return out.str();
+}
+
+TreeNode* TreeTraveler::step() {
+    if (!started) {
+        started = true;
+        if (current) {
+            if (searchMethod == SearchMethod::DEPTH_FIRST) {
+                dfsStack.push_back({current, nullptr});
+            } else {
+                bfsQueue.push({current, nullptr});
+            }
+        }
+    }
+
+    if (searchMethod == SearchMethod::DEPTH_FIRST) {
+        while (!dfsStack.empty()) {
+            auto [node, slot] = dfsStack.back();
+            dfsStack.pop_back();
+            // Push right before left so left is the next one popped, preserving left-to-right order.
+            if (node->right) dfsStack.push_back({node->right, &node->right});
+            if (node->left) dfsStack.push_back({node->left, &node->left});
+            current = node;
+            if (node->value == nodeValue) {
+                pointer = node;
+                pointerSlot = slot;
+                return pointer;
+            }
+        }
+    } else { // BREADTH_FIRST
+        while (!bfsQueue.empty()) {
+            auto [node, slot] = bfsQueue.front();
+            bfsQueue.pop();
+            if (node->left) bfsQueue.push({node->left, &node->left});
+            if (node->right) bfsQueue.push({node->right, &node->right});
+            current = node;
+            if (node->value == nodeValue) {
+                pointer = node;
+                pointerSlot = slot;
+                return pointer;
+            }
+        }
+    }
+
+    return nullptr; // Frontier exhausted: no (more) matching node.
+}
+
+// `pointerSlot` is the address of whichever field (some ancestor's left or right)
+// pointed at `pointer`, recorded by step() when it found the match. Redirecting that
+// field is a real structural splice, not a content swap. Returns false if nothing has
+// been found yet, or if `pointer` is the root (nothing points at the root, so there's
+// no slot to redirect).
+bool TreeTraveler::swap(TreeNode* newNode) {
+    if (!pointer || !newNode || !pointerSlot) return false;
+
+    newNode->right = pointer->right; // keep pointer's old place in its sibling chain
+    *pointerSlot = newNode;
+    return true;
 }
