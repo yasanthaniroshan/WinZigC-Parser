@@ -29,6 +29,14 @@ Result<TreeNode *> Optimizer::optimize()
         while (numberOfPasses < MAX_PASSES)
         {
             instructionRemovedCount = 0;
+            // Propagate single-assignment constants first: this turns expressions like
+            // `x + 3` (x assigned a constant) into foldable `5 + 3`, which the folding
+            // pass then collapses. Running both to a fixpoint chains the two together.
+            auto propagated = propagateConstants(body, subprogs);
+            if (propagated.isErr())
+            {
+                return Result<TreeNode *>::Err(OptimizerError(propagated.error_message.value()));
+            }
             auto result = constantFoldingPass();
             if (result.isErr())
             {
@@ -40,6 +48,13 @@ Result<TreeNode *> Optimizer::optimize()
                 break; // No more optimizations possible
             }
             numberOfPasses++;
+        }
+        // Propagation can leave globals with no remaining references; sweep them out
+        // of .data (and the declaration list) now that their uses are gone.
+        auto cleanup = removeUnusedVariables(dclns, subprogs, body);
+        if (cleanup.isErr())
+        {
+            return Result<TreeNode *>::Err(OptimizerError(cleanup.error_message.value()));
         }
         if (!warnings.empty())
         {
@@ -372,6 +387,126 @@ Result<void> Optimizer::removeUnusedLocalVariables(TreeNode *subprogs)
                            removed->line, removed->column);
             }
         }
+    }
+    return Result<void>::Ok();
+}
+
+// Count how many times `name` is WRITTEN within `node`'s subtree: assignment
+// targets, swap operands, and read() targets. Over-counting is safe (it only
+// makes propagation more conservative); under-counting would be unsound.
+int Optimizer::countVariableWrites(TreeNode *node, const std::string &name)
+{
+    if (!node) return 0;
+    int count = 0;
+    if (node->value == "assign" && node->left && node->left->value == "<identifier>" &&
+        node->left->left && node->left->left->value == name)
+    {
+        count++;
+    }
+    else if (node->value == "swap" && node->left)
+    {
+        TreeNode *l = node->left;
+        TreeNode *r = l->right;
+        if (l->value == "<identifier>" && l->left && l->left->value == name) count++;
+        if (r && r->value == "<identifier>" && r->left && r->left->value == name) count++;
+    }
+    else if (node->value == "read")
+    {
+        for (TreeNode *c = node->left; c != nullptr; c = c->right)
+            if (c->value == "<identifier>" && c->left && c->left->value == name) count++;
+    }
+    for (TreeNode *c = node->left; c != nullptr; c = c->right)
+        count += countVariableWrites(c, name);
+    return count;
+}
+
+// Does `name` appear anywhere (read or write) as an identifier in `node`'s subtree?
+bool Optimizer::subtreeReferences(TreeNode *node, const std::string &name)
+{
+    if (!node) return false;
+    if (node->value == "<identifier>" && node->left && node->left->value == name) return true;
+    for (TreeNode *c = node->left; c != nullptr; c = c->right)
+        if (subtreeReferences(c, name)) return true;
+    return false;
+}
+
+// Replace every `<identifier>` read of `name` in `parent`'s subtree with a fresh
+// `<integer>` literal node holding `literal`. Sibling links are preserved.
+int Optimizer::replaceVariableReads(TreeNode *parent, const std::string &name, const std::string &literal)
+{
+    if (!parent) return 0;
+    int replaced = 0;
+    TreeNode *prev = nullptr;
+    for (TreeNode *c = parent->left; c != nullptr;)
+    {
+        if (c->value == "<identifier>" && c->left && c->left->value == name)
+        {
+            TreeNode *lit = new TreeNode("<integer>", c->line, c->column);
+            lit->left = new TreeNode(literal, c->line, c->column);
+            lit->right = c->right; // keep position in the sibling chain
+            if (prev == nullptr) parent->left = lit;
+            else prev->right = lit;
+            replaced++;
+            prev = lit;
+            c = lit->right;
+        }
+        else
+        {
+            replaced += replaceVariableReads(c, name, literal);
+            prev = c;
+            c = c->right;
+        }
+    }
+    return replaced;
+}
+
+// Single-assignment constant propagation over the program body's top-level
+// statements. A global qualifies only when ALL of these hold (a sufficient
+// condition for the single definition to dominate every use):
+//   - it is not referenced by any subprogram (so its whole lifetime is here),
+//   - it is written exactly once in the body, by a top-level `v := <integer>`,
+//   - no earlier top-level statement references it.
+// Then every later read is rewritten to the literal and the assignment removed.
+Result<void> Optimizer::propagateConstants(TreeNode *body, TreeNode *subprogs)
+{
+    if (!body || !body->left) return Result<void>::Ok();
+
+    TreeNode *prevStmt = nullptr;
+    for (TreeNode *stmt = body->left; stmt != nullptr;)
+    {
+        TreeNode *nextStmt = stmt->right;
+        bool removed = false;
+
+        if (stmt->value == "assign" && stmt->left && stmt->left->value == "<identifier>" &&
+            stmt->left->left)
+        {
+            const std::string name = stmt->left->left->value;
+            TreeNode *rhs = stmt->left->right;
+            if (rhs && rhs->value == "<integer>" && rhs->left)
+            {
+                const std::string literal = rhs->left->value;
+                bool confined = !subprogs || !subtreeReferences(subprogs, name);
+                if (confined && countVariableWrites(body, name) == 1)
+                {
+                    bool referencedBefore = false;
+                    for (TreeNode *s = body->left; s != stmt; s = s->right)
+                        if (subtreeReferences(s, name)) { referencedBefore = true; break; }
+
+                    if (!referencedBefore)
+                    {
+                        for (TreeNode *s = nextStmt; s != nullptr; s = s->right)
+                            replaceVariableReads(s, name, literal);
+                        if (prevStmt == nullptr) body->left = nextStmt;
+                        else prevStmt->right = nextStmt;
+                        instructionRemovedCount++;
+                        removed = true;
+                    }
+                }
+            }
+        }
+
+        if (!removed) prevStmt = stmt;
+        stmt = nextStmt;
     }
     return Result<void>::Ok();
 }

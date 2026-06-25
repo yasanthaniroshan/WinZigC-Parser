@@ -71,6 +71,14 @@ class Optimizer {
 
         Result<void> removeConstantModulus(TreeNode* node);
 
+        // Single-assignment constant propagation: replace a variable that is assigned
+        // exactly once (to an integer literal) with that literal at its uses, then drop
+        // the assignment. See the .cpp for the dominance-safety conditions.
+        Result<void> propagateConstants(TreeNode* body, TreeNode* subprogs);
+        int countVariableWrites(TreeNode* node, const std::string& name);
+        bool subtreeReferences(TreeNode* node, const std::string& name);
+        int replaceVariableReads(TreeNode* parent, const std::string& name, const std::string& literal);
+
         // A global is dead only if it is referenced in NEITHER the subprograms nor the body. Removes such globals from both the symbol table and the declaration list.
         Result<void> removeUnusedVariables(TreeNode* dclns, TreeNode* subprogs, TreeNode* body);
         // For each function, remove locals that are never referenced in that function's body. Each function's locals are scoped to its own body, so they're checked there only.

@@ -224,12 +224,14 @@ TEST(OptimizerFoldingTest, DoesNotFoldExpressionWithVariable) {
 // Dead global elimination + address compaction
 // ---------------------------------------------------------------------------
 
+// `x` is kept live via read() (a runtime value, so constant propagation can't
+// fold it away); the never-referenced `unused` global is removed from .data.
 TEST(OptimizerDeadGlobalTest, RemovesUnusedGlobalFromData) {
     auto asmLines = optimizeAsm(
         "program p:\n"
         "var x : integer; unused : integer;\n"
         "begin\n"
-        "    x := 1;\n"
+        "    read(x);\n"
         "    output(x);\n"
         "end p.\n");
 
@@ -238,14 +240,14 @@ TEST(OptimizerDeadGlobalTest, RemovesUnusedGlobalFromData) {
     EXPECT_EQ(std::find(vars.begin(), vars.end(), "unused"), vars.end());
 }
 
-// An unused global in the middle is removed; the survivors remain (and their
-// addresses compact, though .data references them by name).
+// An unused global in the middle is removed; the survivors (kept live via read())
+// remain, and their addresses compact (though .data references them by name).
 TEST(OptimizerDeadGlobalTest, RemovesMiddleUnusedGlobalKeepsOthers) {
     auto asmLines = optimizeAsm(
         "program p:\n"
         "var a : integer; b : integer; c : integer;\n"
         "begin\n"
-        "    a := 1;\n"
+        "    read(a);\n"
         "    c := a + 2;\n"
         "    output(c);\n"
         "end p.\n");
@@ -258,6 +260,79 @@ TEST(OptimizerDeadGlobalTest, RemovesMiddleUnusedGlobalKeepsOthers) {
     // save/load reference globals by name, so the surviving references stay valid.
     EXPECT_TRUE(hasLine(asmLines, "save a"));
     EXPECT_TRUE(hasLine(asmLines, "save c"));
+}
+
+// ---------------------------------------------------------------------------
+// Constant propagation (single-assignment)
+// ---------------------------------------------------------------------------
+
+// A variable assigned a constant exactly once is propagated into its uses; the
+// resulting expression folds, and the now-dead variables drop out of .data.
+TEST(OptimizerConstPropTest, PropagatesSingleConstantThenFolds) {
+    auto asmLines = optimizeAsm(
+        "program p:\n"
+        "var a, b : integer;\n"
+        "begin\n"
+        "    a := 5;\n"
+        "    b := a + 3;\n"
+        "    output(b);\n"
+        "end p.\n");
+
+    EXPECT_TRUE(hasLine(asmLines, "lit 8"));     // a->5, b->5+3->8
+    EXPECT_FALSE(hasOpcode(asmLines, "add"));
+    EXPECT_TRUE(dataVars(asmLines).empty());     // both globals eliminated
+}
+
+// A variable assigned more than once is NOT propagated (not single-assignment).
+TEST(OptimizerConstPropTest, DoesNotPropagateMultiplyAssignedVariable) {
+    auto asmLines = optimizeAsm(
+        "program p:\n"
+        "var x : integer;\n"
+        "begin\n"
+        "    x := 5;\n"
+        "    x := x + 1;\n"
+        "    output(x);\n"
+        "end p.\n");
+
+    auto vars = dataVars(asmLines);
+    EXPECT_NE(std::find(vars.begin(), vars.end(), "x"), vars.end());  // x stays
+    EXPECT_TRUE(hasOpcode(asmLines, "add"));                          // x + 1 not folded
+}
+
+// A use that precedes the single definition must not be propagated (the read
+// would see the default 0, not the later constant).
+TEST(OptimizerConstPropTest, DoesNotPropagateWhenUsedBeforeDefinition) {
+    auto asmLines = optimizeAsm(
+        "program p:\n"
+        "var x : integer;\n"
+        "begin\n"
+        "    output(x);\n"
+        "    x := 5;\n"
+        "    output(x);\n"
+        "end p.\n");
+
+    auto vars = dataVars(asmLines);
+    EXPECT_NE(std::find(vars.begin(), vars.end(), "x"), vars.end());  // x kept
+    EXPECT_TRUE(hasLine(asmLines, "load x"));                         // first output reads x
+}
+
+// A global assigned a constant once but also used inside a function is left
+// alone (cross-scope propagation would be unsound).
+TEST(OptimizerConstPropTest, DoesNotPropagateGlobalUsedInFunction) {
+    auto asmLines = optimizeAsm(
+        "program p:\n"
+        "var g : integer;\n"
+        "function f(n:integer):integer;\n"
+        "begin\n"
+        "    return (g + n);\n"
+        "end f;\n"
+        "begin\n"
+        "    g := 5;\n"
+        "    output(f(1));\n"
+        "end p.\n");
+
+    auto vars = dataVars(asmLines);
+    EXPECT_NE(std::find(vars.begin(), vars.end(), "g"), vars.end());  // g kept (read in f)
 }
 
 // ---------------------------------------------------------------------------
