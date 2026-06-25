@@ -87,7 +87,7 @@ int main(int argc, char** argv) {
         return 1;
     }
     auto optimizer = Optimizer(parserResult.value.value(), semanticAnalyzer.getSymbolTable(), result.optimizationLevel);
-    auto optimizationResult = optimizer.optimize();
+    auto optimizationResult = optimizer.preOptimize();
     if (!optimizationResult.success) {
         LOG_ERROR(optimizationResult.error_message.value());
         return 1;
@@ -98,5 +98,13 @@ int main(int argc, char** argv) {
         LOG_ERROR(codeGenerationResult.error_message.value());
         return 1;
     }
+    // Peephole pass over the emitted assembly (O2), then write the final output.
+    auto assemblyLines = codeGenerator.assembly();
+    auto postResult = optimizer.postOptimize(assemblyLines);
+    if (!postResult.success) {
+        LOG_ERROR(postResult.error_message.value());
+        return 1;
+    }
+    codeGenerator.writeAssembly(assemblyLines);
     return 0;
 }
