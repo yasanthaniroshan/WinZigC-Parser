@@ -22,7 +22,7 @@
     
 struct ArgParserResult {
     std::string inputFile;
-    std::string outputFile = "output.txt";
+    std::string outputFile = "output.asm";
     std::string logLevel = "INFO";
     std::string logFile = "logs/argparser.log";
     bool showVersion = false;
